@@ -2,24 +2,20 @@
 /**
  * Tests for report period maths and schedules.
  *
- * Plain PHPUnit: the plugin autoloader does not map the AMC namespace, so the
- * classes under test are required directly and no WordPress is loaded.
+ * Pure logic: no WordPress functions are called.
  *
- * @package AMC_Automata_Features\Features
+ * @package AMC
  */
 
 declare( strict_types = 1 );
 
-namespace AMC_Automata_Features\Features\Tests\Unit\Reports;
+namespace AMC\Tests\Reports;
 
 use AMC\Reports\Period;
 use AMC\Reports\Periods;
 use DateTimeImmutable;
 use DateTimeZone;
 use PHPUnit\Framework\TestCase;
-
-require_once __DIR__ . '/../../../../inc/Reports/Period.php';
-require_once __DIR__ . '/../../../../inc/Reports/Periods.php';
 
 /**
  * Class PeriodsTest
