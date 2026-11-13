@@ -222,6 +222,37 @@ final class ClientViewTest extends ReportsTestCase {
 		$this->assertStringNotContainsString( 'Hello from the report body', $html );
 	}
 
+	public function test_a_published_report_shows_the_rtcamp_logo_in_its_header(): void {
+		wp_set_current_user( $this->client );
+		$_GET['report'] = (string) $this->published;
+
+		$html = $this->rendered();
+
+		$this->assertStringContainsString( 'class="amc-report-logo"', $html );
+		$this->assertStringContainsString( 'alt="rtCamp"', $html );
+		$this->assertStringContainsString( 'width="96" height="32"', $html );
+		$this->assertStringContainsString( 'assets/images/rtcamp-logo.svg', $html );
+		$this->assertFileExists( AMC_COPILOT_PATH . 'assets/images/rtcamp-logo.svg' );
+		$this->assertLessThan( strpos( $html, 'October Report' ), strpos( $html, 'amc-report-logo' ), 'the logo comes before the title' );
+	}
+
+	public function test_the_logo_url_can_be_overridden_through_the_filter(): void {
+		add_filter( 'amc_report_logo_url', static fn (): string => 'https://example.test/brand.svg' );
+		wp_set_current_user( $this->client );
+		$_GET['report'] = (string) $this->published;
+
+		$html = $this->rendered();
+
+		$this->assertStringContainsString( 'src="https://example.test/brand.svg"', $html );
+		$this->assertStringNotContainsString( 'assets/images/rtcamp-logo.svg', $html );
+	}
+
+	public function test_the_report_view_marks_the_body_for_the_print_stylesheet(): void {
+		( new ClientView() )->enqueue_print_styles();
+
+		$this->assertStringContainsString( 'amc-report-page', (string) apply_filters( 'admin_body_class', '' ) );
+	}
+
 	public function test_the_d2_enqueue_hook_fires_only_on_the_view_screen_of_one_report(): void {
 		global $submenu;
 

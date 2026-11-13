@@ -9,7 +9,9 @@ declare( strict_types = 1 );
 
 namespace AMC\Reports;
 
+use AMC\Core\Assets;
 use AMC\Core\Capabilities;
+use AMC\Main;
 use WP_Post;
 use WP_Query;
 use rtCamp\WPPrimitives\Contracts\Interfaces\Registrable;
@@ -38,6 +40,7 @@ use rtCamp\WPPrimitives\Contracts\Interfaces\Registrable;
  *   do_action( 'amc_report_view_toolbar', WP_Post $post )
  *       Inside the page header, for a "Print / Save as PDF" button.
  *   apply_filters( 'amc_report_view_content', string $html, WP_Post $post )
+ *   apply_filters( 'amc_report_logo_url', string $url )
  *
  * @since 0.1.0
  */
@@ -70,6 +73,32 @@ final class ClientView implements Registrable {
 
 		add_action( 'admin_menu', [ $this, 'register_menu' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue' ] );
+		add_action( 'amc_report_view_enqueue', [ $this, 'enqueue_print_styles' ] );
+	}
+
+	/**
+	 * Load the print stylesheet and mark the page so its print rules apply.
+	 *
+	 * The stylesheet hides the wp-admin chrome only under the
+	 * `amc-report-page` body class, so both are added together.
+	 */
+	public function enqueue_print_styles(): void {
+		/**
+		 * Shared Assets service.
+		 *
+		 * @var Assets $assets
+		 */
+		$assets = Main::get_instance()->get_shared( Assets::class );
+
+		if ( $assets->has_asset( 'css/report-print', 'css' ) ) {
+			$assets->register_style( 'amc-report-print', 'css/report-print' );
+			wp_enqueue_style( 'amc-report-print' );
+		}
+
+		add_filter(
+			'admin_body_class',
+			static fn ( string $classes ): string => $classes . ' amc-report-page'
+		);
 	}
 
 	/**
@@ -260,7 +289,15 @@ final class ClientView implements Registrable {
 		 */
 		$body = (string) apply_filters( 'amc_report_view_content', do_blocks( $post->post_content ), $post );
 
-		echo '<div class="wrap amc-report-view"><h1 class="wp-heading-inline">' . esc_html( get_the_title( $post ) ) . '</h1>';
+		/**
+		 * Filters the rtCamp logo URL shown at the top of every report.
+		 *
+		 * @param string $url Logo image URL.
+		 */
+		$logo = (string) apply_filters( 'amc_report_logo_url', plugins_url( 'assets/images/rtcamp-logo.svg', AMC_COPILOT_FILE ) );
+
+		echo '<div class="wrap amc-report-view"><img src="' . esc_url( $logo ) . '" alt="rtCamp" width="96" height="32" class="amc-report-logo">';
+		echo '<h1 class="wp-heading-inline">' . esc_html( get_the_title( $post ) ) . '</h1>';
 		echo '<a href="' . esc_url( $list ) . '" class="page-title-action">' . esc_html__( 'All reports', 'rtcamp-amc-copilot' ) . '</a>';
 
 		if ( 'publish' !== $post->post_status ) {
