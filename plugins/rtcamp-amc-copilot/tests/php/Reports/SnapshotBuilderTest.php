@@ -30,6 +30,17 @@ use DateTimeZone;
  */
 final class SnapshotBuilderTest extends ReportsTestCase {
 
+	public function set_up(): void {
+		parent::set_up();
+
+		// Real checks would run here too and make the outcomes depend on the site; keep only fakes.
+		add_filter(
+			'amc_register_checks',
+			static fn ( array $checks ): array => array_values( array_filter( $checks, static fn ( $check ): bool => $check instanceof FakeCheck ) ),
+			100
+		);
+	}
+
 	/**
 	 * Seed everything the builder reads for October 2026.
 	 */

@@ -47,6 +47,48 @@ final class UpdatesController extends AbstractController {
 	 * GET /updates.
 	 */
 	public function get_screen(): WP_REST_Response {
-		return new WP_REST_Response( [ 'checks' => $this->latest_results( self::CHECK_IDS ) ] );
+		$checks = $this->latest_results( self::CHECK_IDS );
+
+		$csv = [
+			'columns' => [ 'check', 'item', 'installed', 'available', 'status' ],
+			'rows'    => [],
+		];
+
+		$plugins = $checks['updates.plugins']['data']['plugins'] ?? [];
+		foreach ( is_array( $plugins ) ? $plugins : [] as $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+
+			$csv['rows'][] = [
+				'updates.plugins',
+				(string) ( $row['name'] ?? $row['file'] ?? '' ),
+				(string) ( $row['version'] ?? '' ),
+				(string) ( $row['new_version'] ?? '' ),
+				! empty( $row['update_available'] ) ? 'update available' : 'up to date',
+			];
+		}
+
+		$themes = $checks['updates.themes']['data']['themes'] ?? [];
+		foreach ( is_array( $themes ) ? $themes : [] as $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+
+			$csv['rows'][] = [
+				'updates.themes',
+				(string) ( $row['name'] ?? $row['stylesheet'] ?? '' ),
+				(string) ( $row['version'] ?? '' ),
+				(string) ( $row['new_version'] ?? '' ),
+				! empty( $row['update_available'] ) ? 'update available' : 'up to date',
+			];
+		}
+
+		return new WP_REST_Response(
+			[
+				'checks' => $checks,
+				'csv'    => $csv,
+			]
+		);
 	}
 }
