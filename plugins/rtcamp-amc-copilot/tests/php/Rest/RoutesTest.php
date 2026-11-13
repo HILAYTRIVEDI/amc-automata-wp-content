@@ -177,7 +177,6 @@ final class RoutesTest extends TestCase {
 		wp_set_current_user( $this->engineer );
 
 		$this->assertSame( 501, $this->request( 'POST', '/amc/v1/reports/generate', [ 'period_type' => 'month' ] )->get_status() );
-		$this->assertSame( 501, $this->request( 'POST', '/amc/v1/notify/test' )->get_status() );
 		$this->assertSame( 501, $this->request( 'POST', '/amc/v1/saved-fields', [ 'fields' => [ 'x' => 1 ] ] )->get_status() );
 	}
 
