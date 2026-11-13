@@ -17,9 +17,7 @@ use WP_REST_Response;
 /**
  * Class ErrorsController
  *
- * Owner: lane A1 (capture). Works today on whatever is in amc_events;
- * A1 may optimise the sparkline query. Mark resolved / mute =
- * POST /findings/{finding_id}/status.
+ * Owner: lane A1 (capture). Reads amc_events.
  *
  * GET /amc/v1/errors?type=&days=30 → list<{
  *   signature, type, message, source, file, line, count,
@@ -29,6 +27,17 @@ use WP_REST_Response;
  *   finding_status: string|null
  * }>
  *
+ * The list holds the LIMIT most frequent signatures of the period, because the
+ * sparkline costs one query per signature (a batched repository method is a
+ * contract change request).
+ *
+ * POST /amc/v1/errors/{signature}/status  { status: 'open'|'muted'|'resolved' } → Finding
+ *   Applies POST /findings/{id}/status to the unresolved errors.* finding whose
+ *   dedupe_key is the signature (also reachable through `finding_id`). 404
+ *   `amc_not_found` until an errors.* check has opened a finding for it.
+ *   A resolved signature that keeps occurring is reopened by the check as a
+ *   NEW finding, as for every other check.
+ *
  * @since 0.1.0
  */
 final class ErrorsController extends AbstractController {
@@ -37,6 +46,21 @@ final class ErrorsController extends AbstractController {
 	 * Owning lane.
 	 */
 	public const OWNER = 'A1';
+
+	/**
+	 * Most frequent signatures returned.
+	 */
+	public const LIMIT = 100;
+
+	/**
+	 * Checks whose findings use an event signature as dedupe key.
+	 */
+	private const CHECKS = [ 'errors.fatal', 'errors.warnings', 'errors.deprecations' ];
+
+	/**
+	 * Statuses the status route accepts.
+	 */
+	private const STATUSES = [ 'open', 'muted', 'resolved' ];
 
 	/**
 	 * {@inheritDoc}
@@ -60,6 +84,25 @@ final class ErrorsController extends AbstractController {
 				],
 			]
 		);
+
+		$this->route(
+			'/errors/(?P<signature>[a-f0-9]{32})/status',
+			self::creatable(),
+			[ $this, 'set_status' ],
+			[ $this, 'manage' ],
+			[
+				'signature' => [
+					'type'     => 'string',
+					'pattern'  => '^[a-f0-9]{32}$',
+					'required' => true,
+				],
+				'status'    => [
+					'type'     => 'string',
+					'enum'     => self::STATUSES,
+					'required' => true,
+				],
+			]
+		);
 	}
 
 	/**
@@ -74,12 +117,13 @@ final class ErrorsController extends AbstractController {
 			[
 				'type'  => (string) $request->get_param( 'type' ),
 				'since' => gmdate( 'Y-m-d H:00:00', time() - $days * DAY_IN_SECONDS ),
+				'limit' => self::LIMIT,
 			]
 		);
 
 		$findings = ( new FindingsRepository() )->query(
 			[
-				'check_ids' => [ 'errors.fatal', 'errors.warnings', 'errors.deprecations' ],
+				'check_ids' => self::CHECKS,
 				'status'    => 'unresolved',
 				'per_page'  => 500,
 			]
@@ -106,5 +150,36 @@ final class ErrorsController extends AbstractController {
 		}
 
 		return $this->paginated( $items, count( $items ), max( 1, count( $items ) ) );
+	}
+
+	/**
+	 * POST /errors/{signature}/status → Finding.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 */
+	public function set_status( WP_REST_Request $request ): WP_REST_Response|\WP_Error {
+		$signature = (string) $request->get_param( 'signature' );
+		$repo      = new FindingsRepository();
+		$matches   = array_filter(
+			$repo->query(
+				[
+					'check_ids' => self::CHECKS,
+					'status'    => 'unresolved',
+					'per_page'  => 500,
+				]
+			)['items'],
+			static fn ( array $row ): bool => $signature === $row['dedupe_key']
+		);
+
+		if ( [] === $matches ) {
+			return new \WP_Error( 'amc_not_found', __( 'No open finding for this error yet.', 'rtcamp-amc-copilot' ), [ 'status' => 404 ] );
+		}
+
+		$status = (string) $request->get_param( 'status' );
+		foreach ( $matches as $row ) {
+			$repo->set_status( (int) $row['id'], $status );
+		}
+
+		return new WP_REST_Response( self::format_finding( (array) $repo->find( (int) reset( $matches )['id'] ) ) );
 	}
 }
