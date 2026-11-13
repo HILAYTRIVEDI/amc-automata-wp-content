@@ -9,6 +9,7 @@ declare( strict_types = 1 );
 
 namespace AMC\Checks\Inventory;
 
+use AMC\Capture\DeployDiff;
 use AMC\Checks\Check;
 use AMC\Checks\Context;
 use AMC\Checks\Finding;
@@ -24,7 +25,10 @@ use AMC\Storage\SnapshotsRepository;
  * Inventory of installed plugins: active and network-active lists, on wp.org or
  * not, closed on wp.org, last updated on wp.org. Raises a finding when a plugin
  * is closed or abandoned for over 2 years. Stores a weekly snapshot in
- * `amc_snapshots` (kind `plugins`) and diffs it against the previous one.
+ * `amc_snapshots` (kind `plugins`) and diffs it against the previous one; plugin
+ * installs, version changes and removals found that way are logged to
+ * `amc_changes` with source `deploy` (via DeployDiff, which skips anything the
+ * upgrader hooks already logged, so wp-admin and WP-CLI updates are not repeated).
  *
  * Result::$data shape (consumed by the Inventory screen and report CMS section):
  *   plugins list<array{file, name, version, active, network_active, wp_org, closed, last_updated, abandoned}>
@@ -250,12 +254,18 @@ final class PluginInventory implements Check {
 					$changes['removed'][] = $file;
 				}
 			}
-		}
 
-		// TODO(A1 deploy diff): A1 owns logging deploy-time version changes
-		// (source 'deploy') to amc_changes. Hand the diff above to that
-		// helper once it lands on the branch; for now we only report it in
-		// Result::$data.
+			// Log the differences to amc_changes (source `deploy`). Changes that
+			// ChangeLog's upgrader hooks already logged since the previous
+			// snapshot are skipped by DeployDiff. Without a usable previous
+			// snapshot there is no baseline, so nothing is logged.
+			DeployDiff::record(
+				'plugin',
+				self::snapshot_map( array_values( $previous_map ) ),
+				self::snapshot_map( $rows ),
+				is_string( $previous['taken_at'] ?? null ) ? $previous['taken_at'] : null
+			);
+		}
 
 		// Store the new snapshot.
 		$this->snapshots->insert( 'plugins', [ 'plugins' => $rows ] );
@@ -288,6 +298,26 @@ final class PluginInventory implements Check {
 		}
 
 		return Result::pass( __( 'No closed or abandoned plugins found.', 'rtcamp-amc-copilot' ), $data );
+	}
+
+	/**
+	 * Maps snapshot rows to the file => { name, version } shape DeployDiff expects.
+	 *
+	 * @param list<array<string, mixed>> $rows Snapshot rows.
+	 *
+	 * @return array<string, array{name: string, version: string}>
+	 */
+	private static function snapshot_map( array $rows ): array {
+		$map = [];
+
+		foreach ( $rows as $row ) {
+			$map[ (string) $row['file'] ] = [
+				'name'    => (string) ( $row['name'] ?? '' ),
+				'version' => (string) ( $row['version'] ?? '' ),
+			];
+		}
+
+		return $map;
 	}
 
 	/**
