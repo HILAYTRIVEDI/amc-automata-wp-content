@@ -10,7 +10,8 @@ import { __, sprintf } from '@wordpress/i18n';
  * @param {number[]} props.values      Data points, oldest first.
  * @param {number}   [props.width=96]  Width in px.
  * @param {number}   [props.height=24] Height in px.
- * @param {string}   [props.label]     Accessible label; a summary is generated when omitted.
+ * @param {string}   [props.label]     What the series is (e.g. "Response time for /shop"), used to start the text alternative.
+ * @param {string}   [props.unit]      Unit appended to the values in the text alternative (e.g. "ms").
  * @return {Element} SVG.
  */
 export default function Sparkline( {
@@ -18,9 +19,23 @@ export default function Sparkline( {
 	width = 96,
 	height = 24,
 	label,
+	unit = '',
 } ) {
 	if ( ! values?.length ) {
-		return <span>{ '—' }</span>;
+		return (
+			<span>
+				<span aria-hidden="true">{ '—' }</span>
+				<span className="screen-reader-text">
+					{ label
+						? sprintf(
+								/* translators: %s: what the trend shows. */
+								__( '%s: no data', 'rtcamp-amc-copilot' ),
+								label
+							)
+						: __( 'No data', 'rtcamp-amc-copilot' ) }
+				</span>
+			</span>
+		);
 	}
 	const min = Math.min( ...values );
 	const max = Math.max( ...values );
@@ -38,19 +53,23 @@ export default function Sparkline( {
 			return `${ x.toFixed( 1 ) },${ y.toFixed( 1 ) }`;
 		} )
 		.join( ' ' );
-	const summary =
-		label ??
-		sprintf(
-			/* translators: 1: number of points, 2: minimum, 3: maximum, 4: latest value. */
-			__(
-				'Trend over %1$d points: min %2$d, max %3$d, latest %4$d',
-				'rtcamp-amc-copilot'
-			),
-			values.length,
-			min,
-			max,
-			values[ values.length - 1 ]
-		);
+	const withUnit = ( value ) =>
+		`${ Number( Number( value ).toFixed( 1 ) ) }${ unit }`;
+	// A text alternative with the facts a sighted user reads off the line:
+	// how many points, where it started and ended, and the extremes.
+	const description = sprintf(
+		/* translators: 1: number of points, 2: first value, 3: latest value, 4: minimum, 5: maximum. */
+		__(
+			'Trend over %1$d points: first %2$s, latest %3$s, min %4$s, max %5$s',
+			'rtcamp-amc-copilot'
+		),
+		values.length,
+		withUnit( values[ 0 ] ),
+		withUnit( values[ values.length - 1 ] ),
+		withUnit( min ),
+		withUnit( max )
+	);
+	const summary = label ? `${ label }. ${ description }` : description;
 	return (
 		<svg
 			className="amc-sparkline"
@@ -59,6 +78,7 @@ export default function Sparkline( {
 			viewBox={ `0 0 ${ width } ${ height }` }
 			role="img"
 			aria-label={ summary }
+			focusable="false"
 		>
 			<title>{ summary }</title>
 			<polyline

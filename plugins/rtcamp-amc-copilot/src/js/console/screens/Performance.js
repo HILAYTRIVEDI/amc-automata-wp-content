@@ -109,12 +109,21 @@ export default function Performance() {
 										) }
 										width={ 240 }
 										height={ 48 }
+										unit=" ms"
+										label={ __(
+											'Average response time per day',
+											'rtcamp-amc-copilot'
+										) }
 									/>
 									<DataTable
 										data={ data.response_trend }
 										fields={ trendFields }
 										getItemId={ ( item ) => item.date }
 										exportName="amc-performance-trend"
+										label={ __(
+											'Response time by day',
+											'rtcamp-amc-copilot'
+										) }
 										initialView={ { perPage: 7 } }
 									/>
 								</>
@@ -150,6 +159,10 @@ export default function Performance() {
 						fields={ queryFields }
 						getItemId={ ( item ) => item.signature }
 						exportName="amc-performance-slow-queries"
+						label={ __(
+							'Slow queries by caller',
+							'rtcamp-amc-copilot'
+						) }
 					/>
 				</>
 			) }

@@ -142,6 +142,9 @@ function GenerateForm( { closeModal, onDone } ) {
 				value={ range.end }
 				onChange={ ( end ) => setRange( ( r ) => ( { ...r, end } ) ) }
 				required
+				aria-invalid={
+					!! ( range.start && range.end && range.start > range.end )
+				}
 				help={
 					invalid && range.start && range.end
 						? __(
@@ -163,7 +166,9 @@ function GenerateForm( { closeModal, onDone } ) {
 					disabled={ invalid || busy }
 					accessibleWhenDisabled
 				>
-					{ __( 'Generate draft', 'rtcamp-amc-copilot' ) }
+					{ busy
+						? __( 'Generating…', 'rtcamp-amc-copilot' )
+						: __( 'Generate draft', 'rtcamp-amc-copilot' ) }
 				</Button>
 			</div>
 		</form>
@@ -365,6 +370,7 @@ export default function Reports() {
 						fields={ fields }
 						actions={ actions }
 						exportName="amc-reports"
+						label={ __( 'Report list', 'rtcamp-amc-copilot' ) }
 					/>
 					<h3>{ __( 'Saved fields', 'rtcamp-amc-copilot' ) }</h3>
 					<p className="description">
@@ -391,6 +397,7 @@ export default function Reports() {
 							data={ savedRows }
 							fields={ savedFields }
 							exportName="amc-saved-fields"
+							label={ __( 'Saved fields', 'rtcamp-amc-copilot' ) }
 						/>
 					) }
 				</>

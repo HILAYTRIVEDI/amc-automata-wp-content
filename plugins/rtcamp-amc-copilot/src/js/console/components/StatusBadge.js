@@ -41,6 +41,21 @@ export const statusFromSeverity = ( severity ) => {
 };
 
 /**
+ * Translated label for a severity (`critical` becomes "Critical").
+ *
+ * @param {string} severity critical | high | medium | low | info.
+ * @return {string} Label; the raw value for an unknown severity.
+ */
+export const severityLabel = ( severity ) =>
+	( {
+		critical: __( 'Critical', 'rtcamp-amc-copilot' ),
+		high: __( 'High', 'rtcamp-amc-copilot' ),
+		medium: __( 'Medium', 'rtcamp-amc-copilot' ),
+		low: __( 'Low', 'rtcamp-amc-copilot' ),
+		info: __( 'Info', 'rtcamp-amc-copilot' ),
+	} )[ severity ] ?? severity;
+
+/**
  * Status shown as colour, icon AND a text label, never colour alone.
  *
  * Uses the `components-badge` classes that ship with `@wordpress/components`,

@@ -14,7 +14,7 @@ import { navigate, screenUrl } from '../utils/navigation';
  *
  * @param {Object} props
  * @param {number} props.runId   Run ID.
- * @param {string} [props.label] Link text; defaults to "Run #ID".
+ * @param {string} [props.label] Link text; defaults to "Run #ID" plus a hidden hint saying what it opens.
  * @return {Element|null} Link.
  */
 export default function FindingLink( { runId, label } ) {
@@ -40,10 +40,12 @@ export default function FindingLink( { runId, label } ) {
 			} }
 		>
 			{ text }
-			<span className="screen-reader-text">
-				{ ' ' }
-				{ __( '(shows the run data)', 'rtcamp-amc-copilot' ) }
-			</span>
+			{ ! label && (
+				<span className="screen-reader-text">
+					{ ' ' }
+					{ __( '(shows the run data)', 'rtcamp-amc-copilot' ) }
+				</span>
+			) }
 		</a>
 	);
 }

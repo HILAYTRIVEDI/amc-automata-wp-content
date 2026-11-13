@@ -1,7 +1,7 @@
 /**
  * WordPress dependencies
  */
-import { useEffect, useState } from '@wordpress/element';
+import { useEffect, useRef, useState } from '@wordpress/element';
 import { addQueryArgs, getQueryArgs } from '@wordpress/url';
 
 /**
@@ -66,4 +66,30 @@ export const useLocation = () => {
 		};
 	}, [] );
 	return location;
+};
+
+/**
+ * After a modal that is driven by the URL closes, put focus on the screen
+ * heading when nothing else has it. The modal itself returns focus to the
+ * element that opened it; this covers the case where there was none (an
+ * alert-email deep link) or it no longer exists, which would otherwise leave
+ * keyboard and screen reader users at the top of the page.
+ *
+ * @param {boolean} isOpen Whether the modal is open.
+ */
+export const useFocusHeadingOnClose = ( isOpen ) => {
+	const wasOpen = useRef( isOpen );
+	useEffect( () => {
+		if ( wasOpen.current && ! isOpen ) {
+			const heading = document.getElementById( 'amc-screen-title' );
+			const doc = heading?.ownerDocument;
+			if (
+				heading &&
+				( ! doc.activeElement || doc.activeElement === doc.body )
+			) {
+				heading.focus();
+			}
+		}
+		wasOpen.current = isOpen;
+	}, [ isOpen ] );
 };

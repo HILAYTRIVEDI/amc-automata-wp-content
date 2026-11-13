@@ -1,10 +1,11 @@
 /**
  * WordPress dependencies
  */
+import { speak } from '@wordpress/a11y';
 import { Button } from '@wordpress/components';
 import { DataViews, filterSortAndPaginate } from '@wordpress/dataviews';
-import { useMemo, useState } from '@wordpress/element';
-import { __ } from '@wordpress/i18n';
+import { useEffect, useMemo, useRef, useState } from '@wordpress/element';
+import { __, _n, sprintf } from '@wordpress/i18n';
 import { download } from '@wordpress/icons';
 
 /**
@@ -45,7 +46,10 @@ const cellValue = ( field, item ) => {
  * @param {string}                          props.exportName    File name for the CSV export, without extension.
  * @param {boolean}                         [props.isLoading]   Loading state.
  * @param {Object}                          [props.initialView] Overrides for the initial view (sort, filters, perPage, fields).
- * @param {string}                          [props.searchLabel] Accessible search label.
+ * @param {string}                          [props.label]       What the table lists (for example "Last run per group"). Names the
+ *                                                              table, its search field and its export button, so several tables
+ *                                                              on one screen can be told apart.
+ * @param {string}                          [props.searchLabel] Accessible search label (defaults to "Search" plus `label`).
  * @param {Element}                         [props.header]      Extra toolbar content.
  * @param {Element}                         [props.empty]       Empty state.
  * @return {Element} Table.
@@ -58,10 +62,23 @@ export default function DataTable( {
 	exportName,
 	isLoading = false,
 	initialView = {},
-	searchLabel = __( 'Search', 'rtcamp-amc-copilot' ),
+	label,
+	searchLabel,
 	header,
 	empty,
 } ) {
+	const wrapper = useRef( null );
+	const tableLabel = label ?? exportName;
+	const searchName =
+		searchLabel ??
+		( label
+			? sprintf(
+					/* translators: %s: what the table lists. */
+					__( 'Search %s', 'rtcamp-amc-copilot' ),
+					label
+				)
+			: __( 'Search', 'rtcamp-amc-copilot' ) );
+
 	const [ view, setView ] = useState( {
 		type: 'table',
 		search: '',
@@ -77,6 +94,14 @@ export default function DataTable( {
 		() => filterSortAndPaginate( data, view, fields ),
 		[ data, view, fields ]
 	);
+
+	// DataViews renders a bare `<table>` with no caption or name, so name it
+	// after every render (the element is replaced when the view changes).
+	useEffect( () => {
+		wrapper.current
+			?.querySelector( 'table.dataviews-view-table' )
+			?.setAttribute( 'aria-label', tableLabel );
+	} );
 
 	const exportCsv = () => {
 		const { data: filtered } = filterSortAndPaginate(
@@ -96,10 +121,28 @@ export default function DataTable( {
 				)
 			)
 		);
+		speak(
+			sprintf(
+				/* translators: %d: number of rows. */
+				_n(
+					'CSV export started: %d row.',
+					'CSV export started: %d rows.',
+					filtered.length,
+					'rtcamp-amc-copilot'
+				),
+				filtered.length
+			),
+			'polite'
+		);
 	};
 
 	return (
-		<div className="amc-datatable">
+		<div
+			className="amc-datatable"
+			ref={ wrapper }
+			role="region"
+			aria-label={ tableLabel }
+		>
 			<DataViews
 				data={ pageData }
 				fields={ fields }
@@ -110,7 +153,7 @@ export default function DataTable( {
 				defaultLayouts={ DEFAULT_LAYOUTS }
 				getItemId={ getItemId ?? ( ( item ) => String( item.id ) ) }
 				isLoading={ isLoading }
-				searchLabel={ searchLabel }
+				searchLabel={ searchName }
 				empty={ empty }
 				header={
 					<>
@@ -120,6 +163,11 @@ export default function DataTable( {
 							size="compact"
 							icon={ download }
 							onClick={ exportCsv }
+							aria-label={ sprintf(
+								/* translators: %s: what the table lists. */
+								__( 'Export CSV: %s', 'rtcamp-amc-copilot' ),
+								tableLabel
+							) }
 						>
 							{ __( 'Export CSV', 'rtcamp-amc-copilot' ) }
 						</Button>

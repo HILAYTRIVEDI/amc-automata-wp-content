@@ -7,7 +7,7 @@
  * (add `react-dom` to devDependencies to run them; see README).
  */
 
-/* global describe, jest */
+/* global describe, expect, jest */
 
 let reactDomAvailable = true;
 try {
@@ -63,5 +63,34 @@ export const act = async ( callback ) => {
 export const advance = async ( ms ) => {
 	await act( async () => {
 		await jest.advanceTimersByTimeAsync( ms );
+	} );
+};
+
+/**
+ * Assert a container has no axe-core violations (WCAG 2.x A/AA rules plus
+ * axe's best practices). Colour contrast is not evaluated: jsdom has no
+ * layout or stylesheets, so that rule cannot give a result.
+ *
+ * @param {HTMLElement} container Rendered container.
+ * @param {Object}      [options] axe run options.
+ */
+export const expectNoViolations = async ( container, options = {} ) => {
+	const { configureAxe, toHaveNoViolations } = require( 'jest-axe' );
+	expect.extend( toHaveNoViolations );
+	const axe = configureAxe( {
+		rules: { 'color-contrast': { enabled: false } },
+		...options,
+	} );
+	expect( await axe( container ) ).toHaveNoViolations();
+};
+
+/**
+ * Let pending promises and timers (mock API latency, effects) settle.
+ *
+ * @param {number} [ms] Real milliseconds to wait.
+ */
+export const settle = async ( ms = 30 ) => {
+	await act( async () => {
+		await new Promise( ( resolve ) => setTimeout( resolve, ms ) );
 	} );
 };

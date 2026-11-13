@@ -1,8 +1,10 @@
 /**
  * WordPress dependencies
  */
+import { speak } from '@wordpress/a11y';
 import { Notice } from '@wordpress/components';
-import { __ } from '@wordpress/i18n';
+import { useEffect, useRef } from '@wordpress/element';
+import { __, sprintf } from '@wordpress/i18n';
 
 /**
  * Internal dependencies
@@ -23,7 +25,12 @@ import Settings from './screens/Settings';
 import Smoke from './screens/Smoke';
 import Updates from './screens/Updates';
 import Vulnerabilities from './screens/Vulnerabilities';
-import { navigate, screenUrl, useLocation } from './utils/navigation';
+import {
+	navigate,
+	screenUrl,
+	useFocusHeadingOnClose,
+	useLocation,
+} from './utils/navigation';
 
 const COMPONENTS = {
 	overview: Overview,
@@ -57,6 +64,29 @@ export default function App() {
 	const isFindingLink = 'findings' === screen;
 	const current = COMPONENTS[ screen ] ? screen : 'overview';
 	const Screen = COMPONENTS[ current ];
+	const firstScreen = useRef( true );
+	useFocusHeadingOnClose( ! isFindingLink && !! finding );
+
+	// Switching screens does not reload the page, so say where we are. Not on
+	// the first render: the page load itself is announced by the browser.
+	useEffect( () => {
+		if ( firstScreen.current ) {
+			firstScreen.current = false;
+			return;
+		}
+		const label = screens.find( ( item ) => item.slug === current )?.label;
+		if ( label ) {
+			speak(
+				sprintf(
+					/* translators: %s: screen name, e.g. Updates. */
+					__( '%s screen', 'rtcamp-amc-copilot' ),
+					label
+				),
+				'polite'
+			);
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [ current ] );
 
 	return (
 		<div className="amc-console">

@@ -2,6 +2,7 @@
  * WordPress dependencies
  */
 import { TabPanel } from '@wordpress/components';
+import { useEffect, useRef } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 
 /**
@@ -62,6 +63,19 @@ const TABS = () => [
 export default function Inventory() {
 	const { data, error, isLoading, reload } = useResource( getInventory );
 	const tabs = TABS();
+	const tabsRef = useRef( null );
+	const hasData = !! data;
+
+	// TabPanel has no prop for the tab list's name; without one a screen reader
+	// announces an unnamed "tab list".
+	useEffect( () => {
+		tabsRef.current
+			?.querySelector( '[role="tablist"]' )
+			?.setAttribute(
+				'aria-label',
+				__( 'Inventory sections', 'rtcamp-amc-copilot' )
+			);
+	}, [ hasData ] );
 
 	return (
 		<ScreenState
@@ -79,7 +93,7 @@ export default function Inventory() {
 			hasData={ !! data }
 		>
 			{ data && (
-				<TabPanel className="amc-tabs" tabs={ tabs }>
+				<TabPanel className="amc-tabs" tabs={ tabs } ref={ tabsRef }>
 					{ ( current ) => (
 						<CheckPanels
 							ids={

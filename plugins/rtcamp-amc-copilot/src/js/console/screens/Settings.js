@@ -11,7 +11,13 @@ import {
 	TextareaControl,
 	ToggleControl,
 } from '@wordpress/components';
-import { useCallback, useEffect, useMemo, useState } from '@wordpress/element';
+import {
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 import { trash } from '@wordpress/icons';
 
@@ -38,6 +44,37 @@ import { customField, enumField, textField, toElements } from '../utils/fields';
 import { intervalLabel } from '../utils/format';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Help text for a field with a validation error: the error comes first and is
+ * bold with an "Error:" prefix (so it is not conveyed by emphasis alone), then
+ * the field's normal help. `TextControl` and `TextareaControl` link `help` to
+ * the input with `aria-describedby`, so the error is read with the field.
+ *
+ * @param {string|undefined} error  Error message.
+ * @param {string}           [help] Normal help text.
+ * @return {Element|string|undefined} Help content.
+ */
+const withError = ( error, help ) =>
+	error ? (
+		<>
+			<strong>
+				{ sprintf(
+					/* translators: %s: error message. */
+					__( 'Error: %s', 'rtcamp-amc-copilot' ),
+					error
+				) }
+			</strong>
+			{ help && (
+				<>
+					<br />
+					{ help }
+				</>
+			) }
+		</>
+	) : (
+		help
+	);
 
 const environmentOptions = () => [
 	{ value: '', label: __( 'Detect automatically', 'rtcamp-amc-copilot' ) },
@@ -148,6 +185,10 @@ function Engineers() {
 					fields={ fields }
 					actions={ actions }
 					exportName="amc-settings-engineers"
+					label={ __(
+						'Engineers with access',
+						'rtcamp-amc-copilot'
+					) }
 				/>
 			) }
 			<div className="amc-filters">
@@ -277,6 +318,7 @@ function SavedFieldsEditor() {
 					data={ rows }
 					fields={ fields }
 					exportName="amc-settings-saved-fields"
+					label={ __( 'Saved report fields', 'rtcamp-amc-copilot' ) }
 					initialView={ { perPage: 20 } }
 				/>
 			) }
@@ -308,6 +350,9 @@ export default function Settings() {
 	const [ password, setPassword ] = useState( '' );
 	const [ overrides, setOverrides ] = useState( {} );
 	const [ saving, setSaving ] = useState( false );
+	const [ errors, setErrors ] = useState( {} );
+	const recipientsRef = useRef( null );
+	const digestTimeRef = useRef( null );
 
 	useEffect( () => {
 		if ( data ) {
@@ -317,8 +362,10 @@ export default function Settings() {
 		}
 	}, [ data ] );
 
-	const set = ( key ) => ( value ) =>
+	const set = ( key ) => ( value ) => {
+		setErrors( ( current ) => ( { ...current, [ key ]: undefined } ) );
 		setForm( ( current ) => ( { ...current, [ key ]: value } ) );
+	};
 	const setNested = ( key, nested ) => ( value ) =>
 		setForm( ( current ) => ( {
 			...current,
@@ -374,15 +421,24 @@ export default function Settings() {
 				( item ) => (
 					<ToggleControl
 						__nextHasNoMarginBottom
-						aria-label={ sprintf(
-							/* translators: %s: check name. */
-							__( 'Enable %s', 'rtcamp-amc-copilot' ),
-							item.label
-						) }
+						// The visible text ("On"/"Off") stays in the accessible
+						// name; the check name is added for screen readers only.
 						label={
-							item.enabled
-								? __( 'On', 'rtcamp-amc-copilot' )
-								: __( 'Off', 'rtcamp-amc-copilot' )
+							<>
+								<span className="screen-reader-text">
+									{ sprintf(
+										/* translators: %s: check name. */
+										__(
+											'Enable %s:',
+											'rtcamp-amc-copilot'
+										),
+										item.label
+									) }{ ' ' }
+								</span>
+								{ item.enabled
+									? __( 'On', 'rtcamp-amc-copilot' )
+									: __( 'Off', 'rtcamp-amc-copilot' ) }
+							</>
 						}
 						checked={ item.enabled }
 						onChange={ ( enabled ) =>
@@ -456,24 +512,30 @@ export default function Settings() {
 			( value ) => ! EMAIL.test( value )
 		);
 		if ( badAddress ) {
-			notice.error(
-				sprintf(
-					/* translators: %s: email address. */
-					__(
-						'"%s" is not a valid email address.',
-						'rtcamp-amc-copilot'
-					),
-					badAddress
-				)
+			const message = sprintf(
+				/* translators: %s: email address. */
+				__(
+					'"%s" is not a valid email address.',
+					'rtcamp-amc-copilot'
+				),
+				badAddress
 			);
+			setErrors( { recipients: message } );
+			notice.error( message );
+			recipientsRef.current?.focus();
 			return;
 		}
 		if ( ! /^\d{2}:\d{2}$/.test( form.digest_time ) ) {
-			notice.error(
-				__( 'Enter the digest time as HH:MM.', 'rtcamp-amc-copilot' )
+			const message = __(
+				'Enter the digest time as HH:MM.',
+				'rtcamp-amc-copilot'
 			);
+			setErrors( { digest_time: message } );
+			notice.error( message );
+			digestTimeRef.current?.focus();
 			return;
 		}
+		setErrors( {} );
 
 		// Overrides for checks this site does not have (a lane not shipped yet)
 		// are kept; for known checks only non-default values are stored.
@@ -533,7 +595,9 @@ export default function Settings() {
 					disabled={ ! form || saving }
 					accessibleWhenDisabled
 				>
-					{ __( 'Save settings', 'rtcamp-amc-copilot' ) }
+					{ saving
+						? __( 'Saving…', 'rtcamp-amc-copilot' )
+						: __( 'Save settings', 'rtcamp-amc-copilot' ) }
 				</Button>
 			}
 			isLoading={ isLoading }
@@ -610,13 +674,24 @@ export default function Settings() {
 						<TextareaControl
 							__nextHasNoMarginBottom
 							label={ __( 'Recipients', 'rtcamp-amc-copilot' ) }
-							help={ __(
-								'One email address per line. Leave empty to email every engineer.',
-								'rtcamp-amc-copilot'
+							help={ withError(
+								errors.recipients,
+								__(
+									'One email address per line. Leave empty to email every engineer.',
+									'rtcamp-amc-copilot'
+								)
 							) }
 							rows={ 4 }
 							value={ recipientsText }
-							onChange={ setRecipientsText }
+							onChange={ ( value ) => {
+								setErrors( ( current ) => ( {
+									...current,
+									recipients: undefined,
+								} ) );
+								setRecipientsText( value );
+							} }
+							ref={ recipientsRef }
+							aria-invalid={ !! errors.recipients }
 						/>
 						<TextControl
 							__nextHasNoMarginBottom
@@ -626,8 +701,11 @@ export default function Settings() {
 								'Daily digest time (site time)',
 								'rtcamp-amc-copilot'
 							) }
+							help={ withError( errors.digest_time ) }
 							value={ form.digest_time }
 							onChange={ set( 'digest_time' ) }
+							ref={ digestTimeRef }
+							aria-invalid={ !! errors.digest_time }
 						/>
 						<TextControl
 							__nextHasNoMarginBottom
@@ -726,6 +804,10 @@ export default function Settings() {
 								data={ checkRows }
 								fields={ checkFields }
 								exportName="amc-settings-checks"
+								label={ __(
+									'Check schedule',
+									'rtcamp-amc-copilot'
+								) }
 								initialView={ { perPage: 10 } }
 							/>
 						) }
