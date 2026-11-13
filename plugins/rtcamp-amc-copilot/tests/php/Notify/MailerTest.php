@@ -191,6 +191,7 @@ final class MailerTest extends NotifyTestCase {
 
 	public function test_report_published_respects_the_site_toggle(): void {
 		$id = $this->report( 'publish' );
+		reset_phpmailer_instance();
 		$this->make_admin( 'client@example.com' );
 		Settings::update( [ 'notify_client_on_publish' => false ] );
 

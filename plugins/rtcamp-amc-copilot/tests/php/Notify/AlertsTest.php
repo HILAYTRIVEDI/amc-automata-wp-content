@@ -114,6 +114,9 @@ final class AlertsTest extends NotifyTestCase {
 		$runner  = new Runner();
 		$finding = static fn (): Result => Result::fail( 'bad', [], [ new Finding( 'sig-1', Severity::CRITICAL, 'Fatal in plugin', [] ) ] );
 
+		$alerts = new Alerts();
+		add_action( 'amc_findings_processed', [ $alerts, 'on_findings' ] );
+
 		$check->will_return( $finding );
 		$runner->run( 'errors.fatal', 'cron' );
 		$this->assertSame( 1, $this->sent_count(), 'first appearance alerts' );
@@ -128,6 +131,8 @@ final class AlertsTest extends NotifyTestCase {
 		$check->will_return( $finding );
 		$runner->run( 'errors.fatal', 'cron' );
 		$this->assertSame( 2, $this->sent_count(), 'back after resolving: new row, alerts again' );
+
+		remove_action( 'amc_findings_processed', [ $alerts, 'on_findings' ] );
 	}
 
 	public function test_only_ten_immediate_emails_per_hour_and_overflow_goes_to_the_digest(): void {
