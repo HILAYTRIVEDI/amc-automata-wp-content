@@ -50,6 +50,13 @@ namespace AMC\Reports;
  *
  * Every section key is present; a value the generator could not detect is null.
  *
+ * Quarterly, annual and long custom reports add top-level `totals` and
+ * `monthly` (additive, no version bump). Each `monthly` entry holds label,
+ * start, the change and error counts, and the Performance figures
+ * `avg_response_ms`, `database_size_bytes`, `autoload_size_bytes` (null for a
+ * month without data). Snapshots stored before those keys existed render with
+ * "No data" for the missing figures; read them with MONTHLY_PERFORMANCE_KEYS.
+ *
  * @since 0.1.0
  */
 final class SnapshotSchema {
@@ -58,6 +65,11 @@ final class SnapshotSchema {
 	 * Snapshot format version. Bump only with a migration for stored reports.
 	 */
 	public const VERSION = 1;
+
+	/**
+	 * Performance keys of each `monthly` entry (quarterly and annual reports).
+	 */
+	public const MONTHLY_PERFORMANCE_KEYS = [ 'avg_response_ms', 'database_size_bytes', 'autoload_size_bytes' ];
 
 	/**
 	 * Post meta key holding the snapshot JSON.

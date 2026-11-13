@@ -780,6 +780,83 @@ final class SnapshotBuilderTest extends ReportsTestCase {
 		$this->assertArrayHasKey( 'totals', $snapshot );
 	}
 
+	public function test_quarterly_monthly_entries_carry_the_performance_figures(): void {
+		$tz     = new DateTimeZone( 'UTC' );
+		$period = Periods::previous( Period::TYPE_QUARTER, new DateTimeImmutable( '2026-11-03 09:00:00', $tz ), null, $tz );
+
+		$this->seed_run( 'perf.response', [ 'avg_ms' => 300 ], '2026-07-15 10:00:00' );
+		$this->seed_run( 'perf.response', [ 'avg_ms' => 500 ], '2026-07-16 10:00:00' );
+		$this->seed_run( 'perf.response', [ 'urls' => [ [ 'response_ms' => 700 ], [ 'response_ms' => 900 ] ] ], '2026-09-20 10:00:00' );
+
+		// A size is a level: the month's LAST run wins, not the mean.
+		$this->seed_run(
+			'perf.database',
+			[
+				'database_size_bytes' => 40000000,
+				'autoload_size_bytes' => 500000,
+			],
+			'2026-07-05 10:00:00'
+		);
+		$this->seed_run(
+			'perf.database',
+			[
+				'total_size_bytes'    => 42000000,
+				'autoload_size_bytes' => 600000,
+			],
+			'2026-07-25 10:00:00'
+		);
+		$this->seed_run( 'perf.database', [ 'database_size_bytes' => 50000000 ], '2026-09-10 10:00:00' );
+		// Outside the quarter: must not leak in.
+		$this->seed_run( 'perf.database', [ 'database_size_bytes' => 1 ], '2026-06-30 10:00:00' );
+
+		$monthly = $this->builder()->build( $period, 0, 'cron', false )['monthly'];
+
+		$this->assertSame( [ 400, null, 800 ], array_column( $monthly, 'avg_response_ms' ) );
+		$this->assertSame( [ 42000000, null, 50000000 ], array_column( $monthly, 'database_size_bytes' ) );
+		$this->assertSame( [ 600000, null, null ], array_column( $monthly, 'autoload_size_bytes' ), 'a run without an autoload size is null, not zero' );
+		$this->assertArrayHasKey( 'plugins_updated', $monthly[0], 'existing monthly keys are untouched' );
+		$this->assertArrayHasKey( 'fatal', $monthly[0] );
+	}
+
+	public function test_months_without_any_performance_run_are_null_not_zero(): void {
+		$tz     = new DateTimeZone( 'UTC' );
+		$period = Periods::previous( Period::TYPE_QUARTER, new DateTimeImmutable( '2026-11-03 09:00:00', $tz ), null, $tz );
+
+		$snapshot = $this->builder()->build( $period, 0, 'cron', false );
+
+		$this->assertCount( 3, $snapshot['monthly'] );
+
+		foreach ( $snapshot['monthly'] as $month ) {
+			$this->assertNull( $month['avg_response_ms'] );
+			$this->assertNull( $month['database_size_bytes'] );
+			$this->assertNull( $month['autoload_size_bytes'] );
+		}
+	}
+
+	public function test_annual_monthly_entries_have_performance_figures_per_month(): void {
+		$tz     = new DateTimeZone( 'UTC' );
+		$period = Periods::previous( Period::TYPE_YEAR, new DateTimeImmutable( '2027-01-02 09:00:00', $tz ), null, $tz );
+
+		$this->seed_run( 'perf.response', [ 'avg_ms' => 120 ], '2026-03-15 10:00:00' );
+		$this->seed_run( 'perf.database', [ 'database_size_bytes' => 9000000 ], '2026-12-31 22:00:00' );
+
+		$monthly = $this->builder()->build( $period, 0, 'cron', false )['monthly'];
+
+		$this->assertCount( 12, $monthly );
+		$this->assertSame( 120, $monthly[2]['avg_response_ms'] );
+		$this->assertSame( 9000000, $monthly[11]['database_size_bytes'] );
+		$this->assertNull( $monthly[5]['avg_response_ms'] );
+	}
+
+	public function test_monthly_reports_keep_the_weekly_trend_and_have_no_monthly_list(): void {
+		$this->seed_october();
+
+		$snapshot = $this->builder()->build( $this->october(), 0, 'cron', false );
+
+		$this->assertArrayNotHasKey( 'monthly', $snapshot );
+		$this->assertSame( 'Week of 1 Oct', $snapshot['sections']['performance']['response_trend'][0]['label'] );
+	}
+
 	public function test_saved_fields_are_filled_into_the_snapshot(): void {
 		update_option(
 			'amc_saved_fields',
