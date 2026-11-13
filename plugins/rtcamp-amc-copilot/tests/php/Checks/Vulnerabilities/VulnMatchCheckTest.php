@@ -18,6 +18,7 @@ use AMC\Checks\Vulnerabilities\VulnMatchCheck;
 use AMC\Runner\ProcessedFindings;
 use AMC\Runner\Runner;
 use AMC\Storage\FindingsRepository;
+use AMC\Tests\Support\ReplacesChecks;
 use AMC\Tests\TestCase;
 use AMC\Vulnerability\Component;
 use AMC\Vulnerability\FixtureProvider;
@@ -30,6 +31,8 @@ use AMC\Vulnerability\VulnMatch;
  * Class VulnMatchCheckTest
  */
 final class VulnMatchCheckTest extends TestCase {
+
+	use ReplacesChecks;
 
 	/**
 	 * Installed plugin version the fake inventory reports.
@@ -297,7 +300,7 @@ final class VulnMatchCheckTest extends TestCase {
 		$this->record_processed();
 
 		$repo = new FindingsRepository();
-		$this->register_checks( $this->check_with( $this->fixture_provider() ) );
+		$this->replace_checks( $this->check_with( $this->fixture_provider() ) );
 		$runner = new Runner();
 
 		// Run 1: the critical CVE and the theme one appear as new, un-alerted findings.
@@ -327,7 +330,7 @@ final class VulnMatchCheckTest extends TestCase {
 
 		// A working provider first, then a failing one via a mutable holder.
 		$holder = (object) [ 'provider' => $this->fixture_provider() ];
-		$this->register_checks( new VulnMatchCheck( new Matcher( fn (): array => $this->inventory(), fn (): ProviderInterface => $holder->provider ) ) );
+		$this->replace_checks( new VulnMatchCheck( new Matcher( fn (): array => $this->inventory(), fn (): ProviderInterface => $holder->provider ) ) );
 
 		$runner->run( 'vuln.match' );
 		$this->assertCount( 2, $repo->unresolved_for_check( 'vuln.match' ) );

@@ -18,12 +18,15 @@ use AMC\Checks\Status;
 use AMC\Runner\ProcessedFindings;
 use AMC\Runner\Runner;
 use AMC\Storage\FindingsRepository;
+use AMC\Tests\Support\ReplacesChecks;
 use AMC\Tests\TestCase;
 
 /**
  * Class SslCertificateTest
  */
 final class SslCertificateTest extends TestCase {
+
+	use ReplacesChecks;
 
 	/**
 	 * What the fake connection returns.
@@ -203,7 +206,7 @@ final class SslCertificateTest extends TestCase {
 			}
 		);
 
-		$this->register_checks( $this->check() );
+		$this->replace_checks( $this->check() );
 		$runner = new Runner();
 		$repo   = new FindingsRepository();
 

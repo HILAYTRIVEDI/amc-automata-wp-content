@@ -18,12 +18,15 @@ use AMC\Checks\Status;
 use AMC\Runner\ProcessedFindings;
 use AMC\Runner\Runner;
 use AMC\Storage\FindingsRepository;
+use AMC\Tests\Support\ReplacesChecks;
 use AMC\Tests\TestCase;
 
 /**
  * Class CoreChecksumsTest
  */
 final class CoreChecksumsTest extends TestCase {
+
+	use ReplacesChecks;
 
 	/**
 	 * File "contents" on the fake disk (path => content). A path left out is missing.
@@ -217,7 +220,7 @@ final class CoreChecksumsTest extends TestCase {
 
 		$this->disk['index.php'] = 'EVIL'; // First file: found in batch 1.
 		$this->tick              = 5.0;
-		$this->register_checks( $this->check() );
+		$this->replace_checks( $this->check() );
 		$runner = new Runner();
 		$repo   = new FindingsRepository();
 		$key    = 'core-file:index.php';

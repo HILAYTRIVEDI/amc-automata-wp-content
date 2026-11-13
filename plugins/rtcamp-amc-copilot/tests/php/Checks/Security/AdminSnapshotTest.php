@@ -18,12 +18,15 @@ use AMC\Checks\Status;
 use AMC\Runner\ProcessedFindings;
 use AMC\Runner\Runner;
 use AMC\Storage\SnapshotsRepository;
+use AMC\Tests\Support\ReplacesChecks;
 use AMC\Tests\TestCase;
 
 /**
  * Class AdminSnapshotTest
  */
 final class AdminSnapshotTest extends TestCase {
+
+	use ReplacesChecks;
 
 	/**
 	 * The "database" snapshot (null = none yet).
@@ -167,7 +170,7 @@ final class AdminSnapshotTest extends TestCase {
 		);
 
 		$first = self::factory()->user->create( [ 'role' => 'administrator' ] );
-		$this->register_checks( new AdminSnapshot() );
+		$this->replace_checks( new AdminSnapshot() );
 		$runner = new Runner();
 
 		$runner->run( 'security.admins' );

@@ -19,12 +19,15 @@ use AMC\Core\Settings;
 use AMC\Runner\ProcessedFindings;
 use AMC\Runner\Runner;
 use AMC\Storage\FindingsRepository;
+use AMC\Tests\Support\ReplacesChecks;
 use AMC\Tests\TestCase;
 
 /**
  * Class SmokeUrlsTest
  */
 final class SmokeUrlsTest extends TestCase {
+
+	use ReplacesChecks;
 
 	private const HOME = 'https://example.test/';
 
@@ -409,7 +412,7 @@ final class SmokeUrlsTest extends TestCase {
 			}
 		);
 
-		$this->register_checks( $this->check( [ [ 'url' => self::HOME ] ] ) );
+		$this->replace_checks( $this->check( [ [ 'url' => self::HOME ] ] ) );
 		$runner = new Runner();
 		$repo   = new FindingsRepository();
 
