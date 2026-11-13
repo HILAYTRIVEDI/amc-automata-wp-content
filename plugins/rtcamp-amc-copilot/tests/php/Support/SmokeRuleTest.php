@@ -32,6 +32,7 @@ final class SmokeRuleTest extends TestCase {
 			[
 				'status'  => 'pass',
 				'reasons' => [],
+				'codes'   => [],
 			],
 			SmokeRule::evaluate( 200, 1.2, $this->healthy_body() )
 		);
@@ -45,6 +46,7 @@ final class SmokeRuleTest extends TestCase {
 			[
 				'status'  => 'pass',
 				'reasons' => [],
+				'codes'   => [],
 			],
 			SmokeRule::evaluate( 200, 0.9, $this->healthy_body(), 'Welcome home.' )
 		);
@@ -144,6 +146,7 @@ final class SmokeRuleTest extends TestCase {
 			[
 				'status'  => 'pass',
 				'reasons' => [],
+				'codes'   => [],
 			],
 			SmokeRule::evaluate( 200, 0.5, $body )
 		);
@@ -206,10 +209,34 @@ final class SmokeRuleTest extends TestCase {
 		return [
 			'curl 6 dns'     => [ 'cURL error 6: Could not resolve host: example.com' ],
 			'curl 7 refused' => [ 'cURL error 7: Failed to connect to 127.0.0.1 port 8888: Connection refused' ],
-			'curl 28'        => [ 'cURL error 28: Operation timed out after 30001 milliseconds' ],
 			'refused words'  => [ 'Connection refused by peer' ],
 			'basic auth'     => [ 'HTTP 401 Unauthorized: basic auth credentials required' ],
 		];
+	}
+
+	/**
+	 * A timeout is a failure (a hung site), not a blocked loopback.
+	 */
+	public function test_timeout_fails(): void {
+		$result = SmokeRule::evaluate( 0, 0.0, '', null, 'cURL error 28: Operation timed out after 5001 milliseconds' );
+
+		$this->assertSame( 'fail', $result['status'] );
+		$this->assertSame( [ 'transport_error' ], $result['codes'] );
+	}
+
+	/**
+	 * PHP errors rendered with html_errors (<b> tags) are still detected.
+	 */
+	public function test_html_errors_markup_is_detected(): void {
+		$body = "<br />\n<b>Warning</b>:  Undefined variable \$x in <b>/var/www/wp-content/plugins/p/p.php</b> on line <b>9</b><br />";
+
+		$result = SmokeRule::evaluate( 200, 0.5, $body );
+
+		$this->assertSame( 'fail', $result['status'] );
+		$this->assertSame( [ 'php_error' ], $result['codes'] );
+
+		$fatal = SmokeRule::evaluate( 200, 0.5, '<b>Fatal error</b>: Uncaught Error in <b>/x.php</b>:3' );
+		$this->assertSame( 'fail', $fatal['status'] );
 	}
 
 	/**

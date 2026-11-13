@@ -47,6 +47,7 @@ final class CertParseTest extends TestCase {
 			'extensions'       => [
 				'subjectAltName' => 'DNS:example.com, DNS:www.example.com, DNS:api.example.com, IP Address:93.184.216.34',
 			],
+			'serialNumberHex'  => '03a1b2',
 			'validFrom_time_t' => $this->now()->modify( '-30 days' )->getTimestamp(),
 			'validTo_time_t'   => $this->now()->modify( '+' . $expires_in . ' days' )->getTimestamp(),
 		];
@@ -61,6 +62,7 @@ final class CertParseTest extends TestCase {
 		$this->assertSame( 'R3', $result['issuer'] );
 		$this->assertSame( 'example.com', $result['subject_cn'] );
 		$this->assertSame( [ 'example.com', 'www.example.com', 'api.example.com', '93.184.216.34' ], $result['sans'] );
+		$this->assertSame( '03A1B2', $result['serial'] );
 		$this->assertSame( 60, $result['days_left'] );
 		$this->assertFalse( $result['expired'] );
 		$this->assertFalse( $result['expiring_soon'] );

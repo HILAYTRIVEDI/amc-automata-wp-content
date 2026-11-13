@@ -62,15 +62,18 @@ final class SecurityConfig {
 	/**
 	 * Evaluates the security facts and returns one check item per decision.
 	 *
-	 * Each item is `{key, status: pass|warn|fail, title, detail}`. Salts fail
-	 * when they are missing, still the default placeholder, or shorter than
-	 * 32 characters.
+	 * Each item is `{key, status: pass|warn|fail, code, title, detail}`. `code`
+	 * is a stable machine-readable reason so callers can translate the English
+	 * `title` and `detail`: it equals the status, except for salts, where it is
+	 * `ok`, `missing`, `placeholder`, `short` or `duplicate`. Salts fail when
+	 * they are missing, still the default placeholder, shorter than 32
+	 * characters, or identical to another salt.
 	 *
-	 * @param array<string, mixed> $facts Facts: `disallow_file_edit`, `wp_debug_display`,
-	 *                                     `salts` (array of name => value), `admin_username_exists`,
-	 *                                     `xmlrpc_enabled`, `uploads_listing`.
+	 * @param array<string, mixed> $facts Facts: `disallow_file_edit`, `wp_debug` (optional),
+	 *                                     `wp_debug_display`, `salts` (array of name => value),
+	 *                                     `admin_username_exists`, `xmlrpc_enabled`, `uploads_listing`.
 	 *
-	 * @return array<int, array{key: string, status: string, title: string, detail: string}>
+	 * @return array<int, array{key: string, status: string, code: string, title: string, detail: string}>
 	 */
 	public static function evaluate( array $facts ): array {
 		$results = [];
@@ -78,15 +81,39 @@ final class SecurityConfig {
 		$results[] = self::file_edit_check( $facts );
 		$results[] = self::debug_display_check( $facts );
 
+		$salts  = is_array( $facts['salts'] ?? null ) ? $facts['salts'] : [];
+		$counts = [];
 		foreach ( self::SALT_NAMES as $name ) {
-			$results[] = self::salt_check( $facts, $name );
+			$value = $salts[ $name ] ?? null;
+			if ( is_scalar( $value ) && '' !== trim( (string) $value ) ) {
+				$counts[ (string) $value ] = ( $counts[ (string) $value ] ?? 0 ) + 1;
+			}
+		}
+
+		foreach ( self::SALT_NAMES as $name ) {
+			$value     = $salts[ $name ] ?? null;
+			$duplicate = is_scalar( $value ) && ( $counts[ (string) $value ] ?? 0 ) > 1;
+			$results[] = self::salt_check( $facts, $name, $duplicate );
 		}
 
 		$results[] = self::admin_username_check( $facts );
 		$results[] = self::xmlrpc_check( $facts );
 		$results[] = self::uploads_listing_check( $facts );
 
-		return $results;
+		return array_map(
+			static function ( array $item ): array {
+				$item += [ 'code' => $item['status'] ];
+
+				return [
+					'key'    => $item['key'],
+					'status' => $item['status'],
+					'code'   => $item['code'],
+					'title'  => $item['title'],
+					'detail' => $item['detail'],
+				];
+			},
+			$results
+		);
 	}
 
 	/**
@@ -94,7 +121,7 @@ final class SecurityConfig {
 	 *
 	 * @param array<string, mixed> $facts Facts array.
 	 *
-	 * @return array{key: string, status: string, title: string, detail: string}
+	 * @return array{key: string, status: string, code?: string, title: string, detail: string}
 	 */
 	private static function file_edit_check( array $facts ): array {
 		if ( self::truthy( $facts, 'disallow_file_edit' ) ) {
@@ -119,10 +146,29 @@ final class SecurityConfig {
 	 *
 	 * @param array<string, mixed> $facts Facts array.
 	 *
-	 * @return array{key: string, status: string, title: string, detail: string}
+	 * @return array{key: string, status: string, code?: string, title: string, detail: string}
 	 */
 	private static function debug_display_check( array $facts ): array {
 		$value = $facts['wp_debug_display'] ?? null;
+
+		// WP_DEBUG_DISPLAY only matters while WP_DEBUG is on, and WordPress then displays errors unless it is set to false.
+		if ( array_key_exists( 'wp_debug', $facts ) && ! self::truthy( $facts, 'wp_debug' ) ) {
+			return [
+				'key'    => 'wp_debug_display',
+				'status' => 'pass',
+				'title'  => 'Debug output on live pages',
+				'detail' => 'WP_DEBUG is off, so errors are not displayed on live pages.',
+			];
+		}
+
+		if ( null === $value && array_key_exists( 'wp_debug', $facts ) ) {
+			return [
+				'key'    => 'wp_debug_display',
+				'status' => 'fail',
+				'title'  => 'Debug output on live pages',
+				'detail' => 'WP_DEBUG is on and WP_DEBUG_DISPLAY is not set, so PHP warnings and errors are shown to visitors. Set WP_DEBUG_DISPLAY to false.',
+			];
+		}
 
 		if ( null === $value ) {
 			return [
@@ -155,10 +201,11 @@ final class SecurityConfig {
 	 *
 	 * @param array<string, mixed> $facts Facts array.
 	 * @param string               $name  Salt constant name, e.g. `AUTH_KEY`.
+	 * @param bool                 $duplicate Whether another salt has the same value.
 	 *
-	 * @return array{key: string, status: string, title: string, detail: string}
+	 * @return array{key: string, status: string, code: string, title: string, detail: string}
 	 */
-	private static function salt_check( array $facts, string $name ): array {
+	private static function salt_check( array $facts, string $name, bool $duplicate = false ): array {
 		$key    = 'salt_' . strtolower( $name );
 		$title  = ucwords( strtolower( str_replace( '_', ' ', $name ) ) ) . ' salt';
 		$salts  = is_array( $facts['salts'] ?? null ) ? $facts['salts'] : [];
@@ -169,6 +216,7 @@ final class SecurityConfig {
 			return [
 				'key'    => $key,
 				'status' => 'fail',
+				'code'   => 'missing',
 				'title'  => $title,
 				'detail' => $name . ' is missing. Generate real keys, for example from the WordPress.org secret-key service.',
 			];
@@ -178,6 +226,7 @@ final class SecurityConfig {
 			return [
 				'key'    => $key,
 				'status' => 'fail',
+				'code'   => 'placeholder',
 				'title'  => $title,
 				'detail' => $name . ' is still the default placeholder. Generate real keys, for example from the WordPress.org secret-key service.',
 			];
@@ -187,14 +236,26 @@ final class SecurityConfig {
 			return [
 				'key'    => $key,
 				'status' => 'fail',
+				'code'   => 'short',
 				'title'  => $title,
 				'detail' => $name . ' is only ' . strlen( $string ) . ' characters; use at least ' . self::MIN_SALT_LENGTH . '. Generate real keys, for example from the WordPress.org secret-key service.',
+			];
+		}
+
+		if ( $duplicate ) {
+			return [
+				'key'    => $key,
+				'status' => 'fail',
+				'code'   => 'duplicate',
+				'title'  => $title,
+				'detail' => $name . ' has the same value as another secret key. Every key and salt must be unique.',
 			];
 		}
 
 		return [
 			'key'    => $key,
 			'status' => 'pass',
+			'code'   => 'ok',
 			'title'  => $title,
 			'detail' => $name . ' is set to a real, unique value.',
 		];
@@ -205,7 +266,7 @@ final class SecurityConfig {
 	 *
 	 * @param array<string, mixed> $facts Facts array.
 	 *
-	 * @return array{key: string, status: string, title: string, detail: string}
+	 * @return array{key: string, status: string, code?: string, title: string, detail: string}
 	 */
 	private static function admin_username_check( array $facts ): array {
 		if ( ! self::truthy( $facts, 'admin_username_exists' ) ) {
@@ -230,7 +291,7 @@ final class SecurityConfig {
 	 *
 	 * @param array<string, mixed> $facts Facts array.
 	 *
-	 * @return array{key: string, status: string, title: string, detail: string}
+	 * @return array{key: string, status: string, code?: string, title: string, detail: string}
 	 */
 	private static function xmlrpc_check( array $facts ): array {
 		if ( ! self::truthy( $facts, 'xmlrpc_enabled' ) ) {
@@ -255,7 +316,7 @@ final class SecurityConfig {
 	 *
 	 * @param array<string, mixed> $facts Facts array.
 	 *
-	 * @return array{key: string, status: string, title: string, detail: string}
+	 * @return array{key: string, status: string, code?: string, title: string, detail: string}
 	 */
 	private static function uploads_listing_check( array $facts ): array {
 		if ( ! self::truthy( $facts, 'uploads_listing' ) ) {

@@ -60,7 +60,7 @@ final class SecurityConfigTest extends TestCase {
 		$results = SecurityConfig::evaluate( [ 'salts' => $this->good_salts() ] );
 
 		foreach ( $results as $result ) {
-			$this->assertSame( [ 'key', 'status', 'title', 'detail' ], array_keys( $result ) );
+			$this->assertSame( [ 'key', 'status', 'code', 'title', 'detail' ], array_keys( $result ) );
 			$this->assertContains( $result['status'], [ 'pass', 'warn', 'fail' ] );
 			$this->assertNotSame( '', $result['title'] );
 			$this->assertNotSame( '', $result['detail'] );
@@ -137,6 +137,32 @@ final class SecurityConfigTest extends TestCase {
 		$salts['AUTH_KEY'] = 'put your unique phrase here';
 
 		$this->assertContains( 'salt_auth_key', $this->statuses_of( SecurityConfig::evaluate( [ 'salts' => $salts ] ), 'fail' ) );
+	}
+
+	/**
+	 * Salts must be unique: repeated values fail with the duplicate code.
+	 */
+	public function test_duplicate_salts_fail(): void {
+		$salts                     = $this->good_salts();
+		$salts['SECURE_AUTH_KEY'] = $salts['AUTH_KEY'];
+
+		$results = SecurityConfig::evaluate( [ 'salts' => $salts ] );
+		$codes   = array_column( $results, 'code', 'key' );
+
+		$this->assertSame( 'duplicate', $codes['salt_auth_key'] );
+		$this->assertSame( 'duplicate', $codes['salt_secure_auth_key'] );
+		$this->assertSame( 'ok', $codes['salt_nonce_key'] );
+	}
+
+	/**
+	 * With WP_DEBUG known, an undefined WP_DEBUG_DISPLAY still shows errors.
+	 */
+	public function test_wp_debug_on_with_undefined_display_fails(): void {
+		$on = SecurityConfig::evaluate( [ 'wp_debug' => true, 'salts' => $this->good_salts() ] );
+		$this->assertContains( 'wp_debug_display', $this->statuses_of( $on, 'fail' ) );
+
+		$off = SecurityConfig::evaluate( [ 'wp_debug' => false, 'wp_debug_display' => true, 'salts' => $this->good_salts() ] );
+		$this->assertContains( 'wp_debug_display', $this->statuses_of( $off, 'pass' ) );
 	}
 
 	/**
