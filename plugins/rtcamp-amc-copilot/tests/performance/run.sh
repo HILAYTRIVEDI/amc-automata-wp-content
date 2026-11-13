@@ -56,6 +56,29 @@ activate_plugin() {
 	fi
 }
 
+# Remember the site's state so it is restored on exit, even after a failure:
+# whether the plugin was active and the kill-switch setting.
+WAS_ACTIVE=0
+if run_wp plugin is-active "$PLUGIN" >/dev/null 2>&1; then
+	WAS_ACTIVE=1
+	KILL_SWITCH_WAS="$( run_wp eval 'var_export( (bool) \AMC\Core\Settings::get_value( "kill_switch" ) );' )"
+else
+	KILL_SWITCH_WAS="unknown"
+fi
+
+restore_site() {
+	if [ "$KILL_SWITCH_WAS" = "true" ] || [ "$KILL_SWITCH_WAS" = "false" ]; then
+		run_wp eval "\AMC\Core\Settings::update( [ 'kill_switch' => $KILL_SWITCH_WAS ] );" >/dev/null 2>&1 || true
+	fi
+	if [ "$WAS_ACTIVE" -eq 1 ]; then
+		activate_plugin >/dev/null 2>&1 || true
+	else
+		deactivate_plugin >/dev/null 2>&1 || true
+	fi
+	echo "==> Site restored: plugin $( [ "$WAS_ACTIVE" -eq 1 ] && echo active || echo inactive ), kill switch setting ${KILL_SWITCH_WAS}"
+}
+trap restore_site EXIT
+
 # Forward optional per-URL overrides to k6 (see frontend.js).
 URL_ENVS=( HOME_URL POST_URL ARCHIVE_URL NOT_FOUND_URL SEARCH_URL SLEEP_MS )
 K6_EXTRA_ENV=()

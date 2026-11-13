@@ -125,3 +125,7 @@ To trust the number:
 
 This harness is intentionally **not** part of required CI: a stable 2 ms
 measurement needs a dedicated, quiet host, not a shared runner.
+
+## Site state
+
+`run.sh` deactivates and reactivates the plugin and turns the kill-switch setting off for the active run. On exit (including after a failure) it puts the plugin and the kill-switch setting back the way it found them.
