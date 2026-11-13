@@ -1,0 +1,120 @@
+{
+  "name": "rtcamp-amc-copilot",
+  "version": "0.1.0",
+  "description": "AMC Copilot: maintenance checks, alerts and generated maintenance reports.",
+  "private": true,
+  "author": "rtCamp",
+  "license": "GPL-2.0-or-later",
+  "keywords": [
+    "rtcamp",
+    "wp-plugin",
+    "feature-plugin"
+  ],
+  "homepage": "https://github.com/rtCamp/plugin-elementary#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rtCamp/plugin-elementary.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rtCamp/plugin-elementary/issues"
+  },
+  "engines": {
+    "node": "^24.22.1 || >=26.12.1"
+  },
+  "devDependencies": {
+    "@babel/core": "7.29.7",
+    "@eslint-community/eslint-plugin-eslint-comments": "4.8.1",
+    "@rtcamp/eslint-config": "^1.1.0",
+    "@rtcamp/stylelint-config": "^1.1.0",
+    "@rtcamp/wp-tooling": "^2.0.0",
+    "@wordpress/babel-preset-default": "10.1.0",
+    "@wordpress/block-editor": "18.0.0",
+    "@wordpress/blocks": "16.1.0",
+    "@wordpress/browserslist-config": "7.0.0",
+    "@wordpress/components": "41.0.0",
+    "@wordpress/data": "10.57.0",
+    "@wordpress/element": "8.8.0",
+    "@wordpress/env": "12.1.0",
+    "@wordpress/eslint-plugin": "27.0.0",
+    "@wordpress/i18n": "6.25.0",
+    "@wordpress/icons": "17.0.0",
+    "@wordpress/interactivity": "8.0.0",
+    "@wordpress/scripts": "37.0.0",
+    "@wordpress/server-side-render": "7.1.0",
+    "@wordpress/theme": "4.0.0",
+    "browser-sync": "3.0.4",
+    "browser-sync-webpack-plugin": "2.4.0",
+    "browserslist": "4.29.2",
+    "cross-env": "10.1.0",
+    "css-minimizer-webpack-plugin": "8.0.0",
+    "dotenv": "18.0.4",
+    "eslint": "10.14.0",
+    "eslint-import-resolver-typescript": "4.4.5",
+    "eslint-plugin-jest": "29.17.0",
+    "jest": "30.5.2",
+    "jest-environment-jsdom": "30.5.2",
+    "jest-silent-reporter": "0.6.0",
+    "lint-staged": "17.6.0",
+    "npm-run-all": "4.1.5",
+    "webpack-dev-server": "6.0.0",
+    "webpack-remove-empty-scripts": "1.1.1"
+  },
+  "overrides": {
+    "@babel/core": "7.29.7",
+    "express": {
+      "qs": "6.16.2"
+    },
+    "markdownlint-cli": {
+      "js-yaml": "5.4.1",
+      "smol-toml": "1.9.1"
+    },
+    "copy-webpack-plugin": {
+      "serialize-javascript": "7.1.4"
+    },
+    "@wordpress/scripts": {
+      "adm-zip": "0.6.1"
+    },
+    "@wp-playground/storage": {
+      "isomorphic-git": "1.38.6"
+    },
+    "webpack-dev-server": "$webpack-dev-server"
+  },
+  "scripts": {
+    "build:dev": "cross-env NODE_ENV=development npm-run-all 'build:!(dev|prod)'",
+    "build:prod": "cross-env NODE_ENV=production npm-run-all 'build:!(dev|prod)'",
+    "build:blocks": "wp-scripts build --experimental-modules --config ./node_modules/@wordpress/scripts/config/webpack.config.js --webpack-src-dir=./src/blocks/ --output-path=./assets/build/blocks/",
+    "build:assets": "wp-scripts build --experimental-modules --config ./webpack.config.js",
+    "create:block": "./bin/block-scaffold/block.js",
+    "init": "./bin/init.js",
+    "sync-ai": "node bin/sync-ai.js",
+    "release:bump": "wp-tooling release:bump",
+    "release:changelog": "wp-tooling release:changelog",
+    "release:zip": "wp-tooling release:zip",
+    "prepare": "wp-tooling install-hooks || true && npm run sync-ai",
+    "lint": "npm-run-all --parallel lint:css lint:js lint:php lint:package-json",
+    "lint:css": "npm run lint:css:files -- ./src",
+    "lint:css:files": "wp-scripts lint-style --allow-empty-input=true",
+    "lint:css:fix": "npm run lint:css -- --fix ./src",
+    "lint:js": "npm run lint:js:files -- ./src",
+    "lint:js:files": "wp-scripts lint-js",
+    "lint:js:fix": "npm run lint:js -- --fix ./src",
+    "lint:js:report": "npm run lint:js -- --output-file lint-js-report.json --format json .",
+    "lint:php": "vendor/bin/phpcs",
+    "lint:php:fix": "./bin/phpcbf.sh",
+    "lint:package-json": "wp-scripts lint-pkg-json --ignorePath .gitignore",
+    "lint:staged": "lint-staged",
+    "start:blocks": "cross-env NODE_ENV=development wp-scripts start --hot --experimental-modules --config ./webpack.blocks.config.js --webpack-src-dir=./src/blocks/ --output-path=./assets/build/blocks/",
+    "start:assets": "cross-env NODE_ENV=development wp-scripts start --experimental-modules --config ./webpack.config.js",
+    "start": "npm-run-all --parallel start:*",
+    "test": "npm-run-all --parallel test:js test:php",
+    "test:js": "wp-scripts test-unit-jest --config=tests/js/jest.config.js --passWithNoTests",
+    "test:js:watch": "npm run test:js -- --watch",
+    "pretest:php": "wp-env start --config=.wp-env.tests.json && wp-env run --config=.wp-env.tests.json cli --env-cwd=wp-content/plugins/$(basename \"$PWD\") -- sh -c 'test -f vendor/autoload.php || composer install --no-interaction'",
+    "test:php": "wp-env run --config=.wp-env.tests.json cli --env-cwd=wp-content/plugins/$(basename \"$PWD\") -- vendor/bin/phpunit -c phpunit.xml.dist",
+    "pretest:php:coverage": "echo \"\\e[1m\\e[32mMake sure you have run npm run wp-env start -- --config=.wp-env.tests.json --xdebug=coverage before using this command\\e[0m\" && wp-env run --config=.wp-env.tests.json cli --env-cwd=wp-content/plugins/$(basename \"$PWD\") -- sh -c 'test -f vendor/autoload.php || composer install --no-interaction'",
+    "test:php:coverage": "wp-env run --config=.wp-env.tests.json cli --env-cwd=wp-content/plugins/$(basename \"$PWD\") -- vendor/bin/phpunit -c phpunit.xml.dist --coverage-html coverage",
+    "posttest:php:coverage": "echo \"\\e[1m\\e[32mIf you have run this command with xdbug coverage enabled, you can view the coverage report at /coverage path\\e[0m\"",
+    "wp-env": "wp-env",
+    "pot": "composer run pot"
+  }
+}

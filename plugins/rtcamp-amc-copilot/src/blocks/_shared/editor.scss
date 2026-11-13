@@ -1,0 +1,17 @@
+// Editor-only layout rules for report section blocks. Core styles do the
+// rest; keep this tiny, scoped under .amc-, and colour-free except the
+// admin theme colour variable.
+
+.amc-edited-badge {
+	margin-inline-start: 0.5em;
+	padding: 0 0.4em;
+	border: 1px solid var(--wp-admin-theme-color);
+	border-radius: 2px;
+	color: var(--wp-admin-theme-color);
+	font-size: 0.75em;
+	vertical-align: middle;
+}
+
+.amc-override-control {
+	margin-bottom: 1em;
+}
