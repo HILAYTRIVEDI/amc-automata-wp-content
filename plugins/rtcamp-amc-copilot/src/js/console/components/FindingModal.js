@@ -11,9 +11,9 @@ import { __, sprintf } from '@wordpress/i18n';
 import { getFinding, getRun } from '../api';
 import useResource from '../hooks/useResource';
 import { formatDateTime } from '../utils/format';
-import { navigate } from '../utils/navigation';
 import { ErrorNotice } from './ScreenState';
-import StatusBadge, { statusFromSeverity } from './StatusBadge';
+import FindingLink from './FindingLink';
+import StatusBadge, { severityLabel, statusFromSeverity } from './StatusBadge';
 
 const STATE_LABELS = () => ( {
 	open: __( 'Open', 'rtcamp-amc-copilot' ),
@@ -59,11 +59,18 @@ export default function FindingModal( { findingId, onClose } ) {
 			onRequestClose={ onClose }
 			size="large"
 		>
-			{ isLoading && ! data && <Spinner /> }
+			{ isLoading && ! data && (
+				<p role="status">
+					<Spinner />{ ' ' }
+					<span className="screen-reader-text">
+						{ __( 'Loading the finding…', 'rtcamp-amc-copilot' ) }
+					</span>
+				</p>
+			) }
 			{ error && <ErrorNotice error={ error } /> }
 			{ data && (
 				<>
-					<h3>{ data.finding.title }</h3>
+					<h2>{ data.finding.title }</h2>
 					<dl className="amc-dl">
 						<dt>{ __( 'Severity', 'rtcamp-amc-copilot' ) }</dt>
 						<dd>
@@ -71,7 +78,7 @@ export default function FindingModal( { findingId, onClose } ) {
 								status={ statusFromSeverity(
 									data.finding.severity
 								) }
-								label={ data.finding.severity }
+								label={ severityLabel( data.finding.severity ) }
 							/>
 						</dd>
 						<dt>{ __( 'State', 'rtcamp-amc-copilot' ) }</dt>
@@ -93,9 +100,9 @@ export default function FindingModal( { findingId, onClose } ) {
 						) }
 					</dl>
 
-					<h4>
+					<h3>
 						{ __( 'Run that produced it', 'rtcamp-amc-copilot' ) }
-					</h4>
+					</h3>
 					{ data.run ? (
 						<>
 							<p>
@@ -112,20 +119,13 @@ export default function FindingModal( { findingId, onClose } ) {
 									data.run.id,
 									formatDateTime( data.run.created_at )
 								) }{ ' ' }
-								<a
-									href="#amc-run-data"
-									onClick={ ( event ) => {
-										event.preventDefault();
-										navigate( 'runs', {
-											run: data.run.id,
-										} );
-									} }
-								>
-									{ __(
+								<FindingLink
+									runId={ data.run.id }
+									label={ __(
 										'Show the run data',
 										'rtcamp-amc-copilot'
 									) }
-								</a>
+								/>
 							</p>
 						</>
 					) : (
@@ -137,10 +137,11 @@ export default function FindingModal( { findingId, onClose } ) {
 						</Notice>
 					) }
 
-					<h4>{ __( 'Finding data', 'rtcamp-amc-copilot' ) }</h4>
+					<h3>{ __( 'Finding data', 'rtcamp-amc-copilot' ) }</h3>
 					<pre
 						className="amc-json"
 						tabIndex={ 0 }
+						role="region"
 						aria-label={ __(
 							'Finding data (JSON)',
 							'rtcamp-amc-copilot'

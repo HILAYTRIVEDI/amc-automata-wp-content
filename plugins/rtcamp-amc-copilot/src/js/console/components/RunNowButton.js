@@ -1,6 +1,7 @@
 /**
  * WordPress dependencies
  */
+import { speak } from '@wordpress/a11y';
 import { Button, Notice, Spinner } from '@wordpress/components';
 import { useCallback, useEffect, useRef, useState } from '@wordpress/element';
 import { __, _n, sprintf } from '@wordpress/i18n';
@@ -14,6 +15,16 @@ const DEFAULT_POLL_MS = 2500;
 // About ten minutes: a queued run waits for the next scheduler tick.
 const MAX_POLLS = 240;
 const PENDING = [ 'queued', 'running' ];
+
+/**
+ * Politeness for the spoken result: a run that could not run interrupts,
+ * everything else waits its turn.
+ *
+ * @param {string} status Notice status.
+ * @return {string} `assertive` | `polite`.
+ */
+const politenessFor = ( status ) =>
+	'error' === status ? 'assertive' : 'polite';
 
 /**
  * Notice for a set of finished runs.
@@ -97,18 +108,32 @@ export default function RunNowButton( {
 		[]
 	);
 
-	const fail = useCallback( ( failure ) => {
-		if ( ! mounted.current ) {
-			return;
-		}
+	// Shows the notice and speaks it. The Notice's own announcement is turned
+	// off (`spokenMessage=""`), so the result is read out exactly once, with
+	// the politeness chosen here.
+	const finish = useCallback( ( result ) => {
 		setPhase( 'idle' );
-		setNotice( {
-			status: 'error',
-			text:
-				failure?.message ||
-				__( 'The check could not be queued.', 'rtcamp-amc-copilot' ),
-		} );
+		setNotice( result );
+		speak( result.text, politenessFor( result.status ) );
 	}, [] );
+
+	const fail = useCallback(
+		( failure ) => {
+			if ( ! mounted.current ) {
+				return;
+			}
+			finish( {
+				status: 'error',
+				text:
+					failure?.message ||
+					__(
+						'The check could not be queued.',
+						'rtcamp-amc-copilot'
+					),
+			} );
+		},
+		[ finish ]
+	);
 
 	const poll = useCallback(
 		( runIds, attempt = 0 ) => {
@@ -125,12 +150,10 @@ export default function RunNowButton( {
 					if (
 						! runs.some( ( run ) => PENDING.includes( run.status ) )
 					) {
-						setPhase( 'idle' );
-						setNotice( summarise( runs ) );
+						finish( summarise( runs ) );
 						onCompleteRef.current?.( runs );
 					} else if ( attempt >= MAX_POLLS ) {
-						setPhase( 'idle' );
-						setNotice( {
+						finish( {
 							status: 'warning',
 							text: __(
 								'Still queued. The result will appear on the Runs screen when the scheduler picks it up.',
@@ -150,12 +173,23 @@ export default function RunNowButton( {
 				}
 			}, delay );
 		},
-		[ fail, pollInterval ]
+		[ fail, finish, pollInterval ]
 	);
 
 	const start = async () => {
 		setNotice( null );
 		setPhase( 'queued' );
+		speak(
+			sprintf(
+				/* translators: %s: button label, e.g. "Run all checks". */
+				__(
+					'%s: queued. The result will be announced.',
+					'rtcamp-amc-copilot'
+				),
+				label
+			),
+			'polite'
+		);
 		try {
 			const runIds = rerunId
 				? [ ( await rerunRun( rerunId ) ).run_id ]
@@ -175,13 +209,23 @@ export default function RunNowButton( {
 			: __( 'Queued…', 'rtcamp-amc-copilot' );
 
 	return (
-		<span className="amc-run-now">
+		<div className="amc-run-now">
 			<Button
 				variant={ variant }
 				onClick={ start }
 				disabled={ busy }
 				accessibleWhenDisabled
 				aria-busy={ busy }
+				aria-label={
+					busy
+						? sprintf(
+								/* translators: 1: button label, 2: state, e.g. "Queued…". */
+								__( '%1$s: %2$s', 'rtcamp-amc-copilot' ),
+								label,
+								busyText
+							)
+						: undefined
+				}
 			>
 				{ busy ? busyText : label }
 			</Button>
@@ -189,12 +233,13 @@ export default function RunNowButton( {
 			{ notice && (
 				<Notice
 					status={ notice.status }
+					spokenMessage=""
 					isDismissible
 					onRemove={ () => setNotice( null ) }
 				>
 					{ notice.text }
 				</Notice>
 			) }
-		</span>
+		</div>
 	);
 }

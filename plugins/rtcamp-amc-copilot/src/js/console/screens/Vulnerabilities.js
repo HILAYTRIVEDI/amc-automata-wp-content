@@ -120,7 +120,9 @@ function AcceptRiskForm( { items, closeModal, onSubmit } ) {
 					accessibleWhenDisabled
 					isBusy={ busy }
 				>
-					{ __( 'Accept risk', 'rtcamp-amc-copilot' ) }
+					{ busy
+						? __( 'Saving…', 'rtcamp-amc-copilot' )
+						: __( 'Accept risk', 'rtcamp-amc-copilot' ) }
 				</Button>
 			</div>
 		</form>
@@ -271,6 +273,10 @@ export default function Vulnerabilities() {
 						fields={ fields }
 						actions={ actions }
 						exportName="amc-vulnerabilities"
+						label={ __(
+							'Vulnerability matches',
+							'rtcamp-amc-copilot'
+						) }
 					/>
 				</>
 			) }

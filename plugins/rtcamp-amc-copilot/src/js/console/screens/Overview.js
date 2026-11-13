@@ -12,7 +12,10 @@ import { getOverview } from '../api';
 import DataTable from '../components/DataTable';
 import RunNowButton from '../components/RunNowButton';
 import ScreenState from '../components/ScreenState';
-import StatusBadge, { statusFromSeverity } from '../components/StatusBadge';
+import StatusBadge, {
+	severityLabel,
+	statusFromSeverity,
+} from '../components/StatusBadge';
 import useResource from '../hooks/useResource';
 import {
 	customField,
@@ -22,15 +25,6 @@ import {
 } from '../utils/fields';
 
 const SEVERITIES = [ 'critical', 'high', 'medium', 'low', 'info' ];
-
-const severityLabel = ( severity ) =>
-	( {
-		critical: __( 'Critical', 'rtcamp-amc-copilot' ),
-		high: __( 'High', 'rtcamp-amc-copilot' ),
-		medium: __( 'Medium', 'rtcamp-amc-copilot' ),
-		low: __( 'Low', 'rtcamp-amc-copilot' ),
-		info: __( 'Info', 'rtcamp-amc-copilot' ),
-	} )[ severity ];
 
 /**
  * Overview screen (`GET /overview`): overall status, open findings by
@@ -106,7 +100,12 @@ export default function Overview() {
 					<div className="amc-grid">
 						<Card>
 							<CardHeader>
-								{ __( 'Overall status', 'rtcamp-amc-copilot' ) }
+								<h3 className="amc-card-title">
+									{ __(
+										'Overall status',
+										'rtcamp-amc-copilot'
+									) }
+								</h3>
 							</CardHeader>
 							<CardBody>
 								<StatusBadge status={ data.status } />
@@ -114,10 +113,12 @@ export default function Overview() {
 						</Card>
 						<Card>
 							<CardHeader>
-								{ __(
-									'Open findings by severity',
-									'rtcamp-amc-copilot'
-								) }
+								<h3 className="amc-card-title">
+									{ __(
+										'Open findings by severity',
+										'rtcamp-amc-copilot'
+									) }
+								</h3>
 							</CardHeader>
 							<CardBody>
 								<ul className="amc-list">
@@ -143,7 +144,9 @@ export default function Overview() {
 						</Card>
 						<Card>
 							<CardHeader>
-								{ __( 'Versions', 'rtcamp-amc-copilot' ) }
+								<h3 className="amc-card-title">
+									{ __( 'Versions', 'rtcamp-amc-copilot' ) }
+								</h3>
 							</CardHeader>
 							<CardBody>
 								<dl className="amc-dl">
@@ -187,7 +190,9 @@ export default function Overview() {
 						</Card>
 						<Card>
 							<CardHeader>
-								{ __( 'Counts', 'rtcamp-amc-copilot' ) }
+								<h3 className="amc-card-title">
+									{ __( 'Counts', 'rtcamp-amc-copilot' ) }
+								</h3>
 							</CardHeader>
 							<CardBody>
 								<dl className="amc-dl">
@@ -244,6 +249,10 @@ export default function Overview() {
 						fields={ groupFields }
 						getItemId={ ( item ) => item.group }
 						exportName="amc-overview-groups"
+						label={ __(
+							'Last run per group',
+							'rtcamp-amc-copilot'
+						) }
 						initialView={ { perPage: 12 } }
 					/>
 
@@ -261,6 +270,10 @@ export default function Overview() {
 						fields={ nextFields }
 						getItemId={ ( item ) => item.check_id }
 						exportName="amc-overview-next-runs"
+						label={ __(
+							'Next scheduled runs',
+							'rtcamp-amc-copilot'
+						) }
 					/>
 				</>
 			) }

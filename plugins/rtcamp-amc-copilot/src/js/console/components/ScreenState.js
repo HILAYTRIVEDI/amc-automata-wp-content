@@ -114,7 +114,11 @@ export default function ScreenState( {
 	return (
 		<section className="amc-screen" aria-labelledby="amc-screen-title">
 			<div className="amc-screen-head">
-				<h2 id="amc-screen-title" className="wp-heading-inline">
+				<h2
+					id="amc-screen-title"
+					className="wp-heading-inline"
+					tabIndex={ -1 }
+				>
 					{ title }
 				</h2>
 				<div className="amc-screen-actions">{ actions }</div>
@@ -122,7 +126,7 @@ export default function ScreenState( {
 			{ error && <ErrorNotice error={ error } onRetry={ onRetry } /> }
 			<StubNotice lane={ stub } />
 			{ isLoading && ! hasData && ! error && (
-				<p>
+				<p role="status">
 					<Spinner />{ ' ' }
 					<span className="screen-reader-text">
 						{ __( 'Loading…', 'rtcamp-amc-copilot' ) }
