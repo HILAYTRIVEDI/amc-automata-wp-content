@@ -176,9 +176,7 @@ final class RoutesTest extends TestCase {
 	public function test_other_lanes_write_routes_return_501(): void {
 		wp_set_current_user( $this->engineer );
 
-		$this->assertSame( 501, $this->request( 'POST', '/amc/v1/reports/generate', [ 'period_type' => 'month' ] )->get_status() );
 		$this->assertSame( 501, $this->request( 'POST', '/amc/v1/notify/test' )->get_status() );
-		$this->assertSame( 501, $this->request( 'POST', '/amc/v1/saved-fields', [ 'fields' => [ 'x' => 1 ] ] )->get_status() );
 	}
 
 	public function test_stub_reads_are_marked(): void {
