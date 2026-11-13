@@ -46,6 +46,37 @@ final class InventoryController extends AbstractController {
 	 * GET /inventory.
 	 */
 	public function get_screen(): WP_REST_Response {
-		return new WP_REST_Response( [ 'checks' => $this->latest_results( self::CHECK_IDS ) ] );
+		$checks = $this->latest_results( self::CHECK_IDS );
+
+		$csv = [
+			'columns' => [ 'file', 'name', 'version', 'active', 'network_active', 'wp_org', 'closed', 'abandoned', 'last_updated' ],
+			'rows'    => [],
+		];
+
+		$plugins = $checks['inventory.plugins']['data']['plugins'] ?? [];
+		foreach ( is_array( $plugins ) ? $plugins : [] as $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+
+			$csv['rows'][] = [
+				(string) ( $row['file'] ?? '' ),
+				(string) ( $row['name'] ?? '' ),
+				(string) ( $row['version'] ?? '' ),
+				! empty( $row['active'] ) ? 'yes' : 'no',
+				! empty( $row['network_active'] ) ? 'yes' : 'no',
+				! empty( $row['wp_org'] ) ? 'yes' : 'no',
+				! empty( $row['closed'] ) ? 'yes' : 'no',
+				! empty( $row['abandoned'] ) ? 'yes' : 'no',
+				(string) ( $row['last_updated'] ?? '' ),
+			];
+		}
+
+		return new WP_REST_Response(
+			[
+				'checks' => $checks,
+				'csv'    => $csv,
+			]
+		);
 	}
 }
