@@ -41,9 +41,11 @@ final class RoutesTest extends TestCase {
 		'/amc/v1/updates'                        => [ 'GET' ],
 		'/amc/v1/inventory'                      => [ 'GET' ],
 		'/amc/v1/vulnerabilities'                => [ 'GET' ],
+		'/amc/v1/vulnerabilities/(?P<id>\d+)/accept' => [ 'POST' ],
 		'/amc/v1/security'                       => [ 'GET' ],
 		'/amc/v1/performance'                    => [ 'GET' ],
 		'/amc/v1/smoke'                          => [ 'GET' ],
+		'/amc/v1/smoke/urls'                     => [ 'POST' ],
 		'/amc/v1/errors'                         => [ 'GET' ],
 		'/amc/v1/changes'                        => [ 'GET' ],
 		'/amc/v1/notify/test'                    => [ 'POST' ],
@@ -181,10 +183,11 @@ final class RoutesTest extends TestCase {
 		$this->assertSame( 501, $this->request( 'POST', '/amc/v1/saved-fields', [ 'fields' => [ 'x' => 1 ] ] )->get_status() );
 	}
 
-	public function test_stub_reads_are_marked(): void {
+	public function test_lane_b2_screens_are_no_longer_stubs(): void {
 		wp_set_current_user( $this->engineer );
 
-		$this->assertSame( 'B2', $this->request( 'GET', '/amc/v1/smoke' )->get_headers()['X-AMC-Stub'] );
+		$this->assertArrayNotHasKey( 'X-AMC-Stub', $this->request( 'GET', '/amc/v1/smoke' )->get_headers() );
+		$this->assertArrayNotHasKey( 'X-AMC-Stub', $this->request( 'GET', '/amc/v1/performance' )->get_headers() );
 	}
 
 	public function test_settings_update_needs_manage_options(): void {
