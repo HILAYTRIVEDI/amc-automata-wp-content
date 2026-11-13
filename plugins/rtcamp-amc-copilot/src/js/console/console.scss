@@ -1,0 +1,94 @@
+/*
+ * DataViews is bundled (WordPress has no script handle for it), so its
+ * stylesheet is bundled here. It cannot be a JS import: the package is marked
+ * side-effect free, so webpack would drop it.
+ */
+@use '../../../node_modules/@wordpress/dataviews/build-style/style';
+
+/* Layout only; colours and type come from WordPress core. */
+.amc-console .nav-tab-wrapper {
+	margin-bottom: 16px;
+}
+
+.amc-screen-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	margin: 8px 0;
+}
+
+.amc-screen-actions,
+.amc-run-now,
+.amc-filters,
+.amc-modal-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+}
+
+.amc-modal-actions {
+	justify-content: flex-end;
+	margin-top: 16px;
+}
+
+.amc-filters {
+	align-items: flex-end;
+	margin-bottom: 12px;
+}
+
+.amc-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+	gap: 16px;
+	margin-bottom: 16px;
+}
+
+.amc-check-panel {
+	margin-bottom: 16px;
+}
+
+.amc-check-panel-title,
+.amc-check-data-section h4 {
+	margin: 0;
+}
+
+.amc-check-data-section {
+	margin-top: 16px;
+}
+
+.amc-list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+
+	li + li {
+		margin-top: 6px;
+	}
+}
+
+.amc-dl {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 4px 12px;
+	margin: 0 0 8px;
+
+	dd {
+		margin: 0;
+	}
+}
+
+.amc-dl-row {
+	display: contents;
+}
+
+.amc-json {
+	max-height: 60vh;
+	overflow: auto;
+}
+
+.amc-sparkline {
+	vertical-align: middle;
+}
