@@ -25,7 +25,7 @@ return [
 		/**
 		 * Parent theme (none).
 		 */
-		public function parent(): false {
+		public function parent(): bool {
 			return false;
 		}
 	},
@@ -46,7 +46,7 @@ return [
 		/**
 		 * Parent theme (none).
 		 */
-		public function parent(): false {
+		public function parent(): bool {
 			return false;
 		}
 	},
