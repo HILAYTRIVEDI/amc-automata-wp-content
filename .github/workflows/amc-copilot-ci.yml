@@ -162,7 +162,10 @@ jobs:
       - name: Production build
         run: npm run build:prod
 
-  # Playwright against wp-env. Skipped until the first e2e spec lands.
+  # Playwright against wp-env (tests/e2e/). wp-env mounts the plugin directory,
+  # so the production build and the Composer autoloader must exist on the runner
+  # before it starts; the specs drive the dev site on :8888 and use
+  # `wp-env run cli` for WP-CLI (generate and publish reports, grant roles).
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
@@ -170,46 +173,49 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Look for e2e specs
-        id: specs
-        run: |
-          if find tests -path '*e2e*' \( -name '*.spec.js' -o -name '*.spec.ts' \) | grep -q .; then
-            echo "found=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "found=false" >> "$GITHUB_OUTPUT"
-            echo "No Playwright specs yet; e2e skipped." >> "$GITHUB_STEP_SUMMARY"
-          fi
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+          tools: composer:v2
 
-      - if: steps.specs.outputs.found == 'true'
-        uses: actions/setup-node@v4
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer
+          key: ${{ runner.os }}-composer-${{ hashFiles('plugins/rtcamp-amc-copilot/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      # Runtime dependencies only: the plugin does not load without vendor/.
+      - run: composer install --no-dev --no-interaction --prefer-dist --no-progress
+
+      - uses: actions/setup-node@v4
         with:
           node-version-file: plugins/rtcamp-amc-copilot/.nvmrc
           cache: npm
           cache-dependency-path: plugins/rtcamp-amc-copilot/package-lock.json
 
-      - if: steps.specs.outputs.found == 'true'
-        run: npm ci --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
 
-      - if: steps.specs.outputs.found == 'true'
-        run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium
 
-      - if: steps.specs.outputs.found == 'true'
+      - name: Build and start wp-env
         run: npm run build:prod && npx wp-env start
 
-      - if: steps.specs.outputs.found == 'true'
+      - name: Playwright
         env:
           CI: 'true'
           WP_BASE_URL: http://localhost:8888
-        run: npx playwright test
+        run: npm run test:e2e
 
       - name: Upload Playwright report
-        if: failure() && steps.specs.outputs.found == 'true'
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
           path: |
             plugins/rtcamp-amc-copilot/playwright-report/
-            plugins/rtcamp-amc-copilot/test-results/
+            plugins/rtcamp-amc-copilot/artifacts/test-results/
           if-no-files-found: ignore
           retention-days: 7
 
