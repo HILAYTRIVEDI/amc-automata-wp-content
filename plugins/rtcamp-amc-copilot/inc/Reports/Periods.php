@@ -205,7 +205,7 @@ final class Periods {
 	 * @return Period Quarterly period.
 	 */
 	private static function previous_quarter( DateTimeImmutable $local, ?DateTimeImmutable $contract_start, DateTimeZone $tz ): Period {
-		[ $anchor_index, $anchor_day ] = self::anchor( $local, $contract_start, $tz );
+		[ $anchor_index, $anchor_day ] = self::anchor( $local, $contract_start );
 
 		$current_index = self::boundary_index_on_or_before( $anchor_index, $anchor_day, 3, $local, $tz );
 		$start_index   = $current_index - 3;
@@ -247,7 +247,7 @@ final class Periods {
 			return new Period( Period::TYPE_YEAR, $start, $end, sprintf( 'Calendar year %d', $year ) );
 		}
 
-		[ $anchor_index, $anchor_day ] = self::anchor( $local, $contract_start, $tz );
+		[ $anchor_index, $anchor_day ] = self::anchor( $local, $contract_start );
 
 		$current_index = self::boundary_index_on_or_before( $anchor_index, $anchor_day, 12, $local, $tz );
 		$start_index   = $current_index - 12;
@@ -286,7 +286,7 @@ final class Periods {
 	 * @return DateTimeImmutable Next run instant.
 	 */
 	private static function next_quarterly_run( DateTimeImmutable $local, ?DateTimeImmutable $contract_start, DateTimeZone $tz ): DateTimeImmutable {
-		[ $anchor_index, $anchor_day ] = self::anchor( $local, $contract_start, $tz );
+		[ $anchor_index, $anchor_day ] = self::anchor( $local, $contract_start );
 
 		return self::next_boundary_run( $local, $anchor_index, $anchor_day, 3, self::QUARTERLY_RUN_MINUTE, $tz );
 	}
@@ -301,7 +301,7 @@ final class Periods {
 	 * @return DateTimeImmutable Next run instant.
 	 */
 	private static function next_annual_run( DateTimeImmutable $local, ?DateTimeImmutable $contract_start, DateTimeZone $tz ): DateTimeImmutable {
-		[ $anchor_index, $anchor_day ] = self::anchor( $local, $contract_start, $tz );
+		[ $anchor_index, $anchor_day ] = self::anchor( $local, $contract_start );
 
 		return self::next_boundary_run( $local, $anchor_index, $anchor_day, 12, self::ANNUAL_RUN_MINUTE, $tz );
 	}
@@ -336,17 +336,19 @@ final class Periods {
 	 * it is the contract's start month and day, clamped month by month.
 	 *
 	 * @param DateTimeImmutable      $local          Current instant in site time.
-	 * @param DateTimeImmutable|null $contract_start Contract start date, if any.
-	 * @param DateTimeZone           $tz             Site timezone.
+	 * @param DateTimeImmutable|null $contract_start Contract start date, if any (its own calendar date is used).
 	 *
 	 * @return array{0: int, 1: int} Absolute anchor month index and preferred day.
 	 */
-	private static function anchor( DateTimeImmutable $local, ?DateTimeImmutable $contract_start, DateTimeZone $tz ): array {
+	private static function anchor( DateTimeImmutable $local, ?DateTimeImmutable $contract_start ): array {
 		if ( null === $contract_start ) {
 			return [ self::month_index( (int) $local->format( 'Y' ), self::YEAR_START_MONTH ), self::MONTH_START_DAY ];
 		}
 
-		$contract = $contract_start->setTimezone( $tz );
+		// The contract start is a calendar date, not an instant: read its own
+		// year, month and day. Converting it to the site timezone would move a
+		// date built at UTC midnight back a day for any site west of UTC.
+		$contract = $contract_start;
 
 		return [
 			self::month_index( (int) $contract->format( 'Y' ), (int) $contract->format( 'n' ) ),
