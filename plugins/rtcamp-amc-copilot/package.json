@@ -24,6 +24,7 @@
   "devDependencies": {
     "@babel/core": "7.29.7",
     "@eslint-community/eslint-plugin-eslint-comments": "4.8.1",
+    "@playwright/test": "1.60.0",
     "@rtcamp/eslint-config": "^1.1.0",
     "@rtcamp/stylelint-config": "^1.1.0",
     "@rtcamp/wp-tooling": "^2.0.0",
@@ -37,6 +38,7 @@
     "@wordpress/data": "10.57.0",
     "@wordpress/dataviews": "19.1.0",
     "@wordpress/date": "5.57.0",
+    "@wordpress/e2e-test-utils-playwright": "3.2.0",
     "@wordpress/element": "8.8.0",
     "@wordpress/env": "12.1.0",
     "@wordpress/eslint-plugin": "27.0.0",
@@ -117,6 +119,7 @@
     "test": "npm-run-all --parallel test:js test:php",
     "test:js": "wp-scripts test-unit-jest --config=tests/js/jest.config.js --passWithNoTests",
     "test:js:watch": "npm run test:js -- --watch",
+    "test:e2e": "playwright test",
     "pretest:php": "wp-env start --config=.wp-env.tests.json && wp-env run --config=.wp-env.tests.json cli --env-cwd=wp-content/plugins/$(basename \"$PWD\") -- sh -c 'test -f vendor/autoload.php || composer install --no-interaction'",
     "test:php": "wp-env run --config=.wp-env.tests.json cli --env-cwd=wp-content/plugins/$(basename \"$PWD\") -- vendor/bin/phpunit -c phpunit.xml.dist",
     "pretest:php:coverage": "echo \"\\e[1m\\e[32mMake sure you have run npm run wp-env start -- --config=.wp-env.tests.json --xdebug=coverage before using this command\\e[0m\" && wp-env run --config=.wp-env.tests.json cli --env-cwd=wp-content/plugins/$(basename \"$PWD\") -- sh -c 'test -f vendor/autoload.php || composer install --no-interaction'",

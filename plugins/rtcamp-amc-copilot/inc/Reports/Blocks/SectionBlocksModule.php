@@ -45,6 +45,7 @@ final class SectionBlocksModule extends AbstractModule {
 			SmokeChecksSection::class,
 			PerformanceSection::class,
 			EngineerNotesSection::class,
+			CustomSectionBlock::class,
 		];
 	}
 }
