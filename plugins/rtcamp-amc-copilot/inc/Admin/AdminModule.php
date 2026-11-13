@@ -26,6 +26,8 @@ final class AdminModule extends AbstractModule {
 	protected function get_classes(): array {
 		return [
 			ConsolePage::class,
+			ConsoleAssets::class,
+			DashboardWidget::class,
 		];
 	}
 }
