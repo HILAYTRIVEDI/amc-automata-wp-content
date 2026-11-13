@@ -1,0 +1,346 @@
+name: AMC Copilot CI
+
+# CI for the AMC Copilot plugin. The plugin lives at
+# plugins/rtcamp-amc-copilot/ in this wp-content repository; every job runs
+# from that directory so the plugin's own composer.json, package.json,
+# phpcs.xml.dist, phpunit.xml.dist and .wp-env*.json are the source of truth.
+#
+# A plugin's own .github/ folder never runs on GitHub. This workflow is the
+# repo-root entry point for that plugin, so it has to be updated whenever the
+# plugin moves.
+
+on:
+  pull_request:
+    paths:
+      - 'plugins/rtcamp-amc-copilot/**'
+  push:
+    branches:
+      - master
+    paths:
+      - 'plugins/rtcamp-amc-copilot/**'
+
+permissions:
+  contents: read
+
+# Cancel superseded runs for the same branch / PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PLUGIN_DIR: plugins/rtcamp-amc-copilot
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Static analysis: PHPCS (plugin ruleset + explicit VIP / Extra standards)
+  # and PHPStan.
+  # ---------------------------------------------------------------------------
+  php-lint:
+    name: PHP lint & static analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: plugins/rtcamp-amc-copilot
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/composer
+            ~/.composer/cache
+          key: ${{ runner.os }}-composer-${{ hashFiles('plugins/rtcamp-amc-copilot/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Show installed PHPCS standards
+        run: vendor/bin/phpcs -i
+
+      - name: PHPCS (plugin ruleset)
+        run: vendor/bin/phpcs -p --standard=phpcs.xml.dist
+
+      - name: PHPCS (WordPress-VIP-Go)
+        run: |
+          set -euo pipefail
+          targets=(inc)
+          if [ -f rtcamp-amc-copilot.php ]; then
+            targets+=(rtcamp-amc-copilot.php)
+          fi
+          vendor/bin/phpcs -p --standard=WordPress-VIP-Go --extensions=php "${targets[@]}"
+
+      - name: PHPCS (WordPress-Extra)
+        run: |
+          set -euo pipefail
+          targets=(inc)
+          if [ -f rtcamp-amc-copilot.php ]; then
+            targets+=(rtcamp-amc-copilot.php)
+          fi
+          vendor/bin/phpcs -p --standard=WordPress-Extra --extensions=php "${targets[@]}"
+
+      # PHPStan auto-detects phpstan.neon / phpstan.neon.dist in the working
+      # directory, so the plugin keeps ownership of its level and baseline.
+      - name: PHPStan
+        run: vendor/bin/phpstan analyse --memory-limit=1G --no-progress
+
+  # ---------------------------------------------------------------------------
+  # PHPUnit through wp-env, PHP 8.1 / 8.3 x WP 6.9 / latest, single-site and
+  # multisite.
+  # ---------------------------------------------------------------------------
+  php-tests:
+    name: PHP tests (PHP ${{ matrix.php }}, WP ${{ matrix.wp }}, ${{ matrix.multisite }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.1', '8.3']
+        wp: ['6.9', 'latest']
+        multisite: ['single-site', 'multisite']
+    defaults:
+      run:
+        working-directory: plugins/rtcamp-amc-copilot
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      # The host PHP only runs Composer; the PHP version under test is the one
+      # wp-env builds into its container (see phpVersion below).
+      - name: Set up host PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+          tools: composer:v2
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: plugins/rtcamp-amc-copilot/package-lock.json
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/composer
+            ~/.composer/cache
+          key: ${{ runner.os }}-composer-${{ hashFiles('plugins/rtcamp-amc-copilot/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Install npm dependencies
+        run: npm ci --no-audit --no-fund
+
+      # A self-contained wp-env config for the matrix. The plugin's own config
+      # pins "core": null; here the WordPress version, PHP version and the test
+      # environment are set explicitly, and the plugin is mounted from the
+      # config's own directory.
+      - name: Write CI wp-env config
+        run: |
+          set -euo pipefail
+          if [ "${{ matrix.wp }}" = "latest" ]; then
+            core=null
+          else
+            core="\"${{ matrix.wp }}\""
+          fi
+          jq -n \
+            --argjson core "$core" \
+            --arg php "${{ matrix.php }}" \
+            '{
+              core: $core,
+              phpVersion: $php,
+              plugins: ["."],
+              testsEnvironment: true,
+              config: { WP_DEBUG: true }
+            }' > .wp-env.ci.json
+          cat .wp-env.ci.json
+
+      - name: Start wp-env
+        run: npx wp-env start --config=.wp-env.ci.json
+
+      - name: Run PHPUnit
+        env:
+          MULTISITE: ${{ matrix.multisite == 'multisite' && '1' || '0' }}
+        run: |
+          set -euo pipefail
+          ms_env=""
+          if [ "${MULTISITE}" = "1" ]; then
+            # The WordPress test suite switches to multisite when either of
+            # these is set; set both so wp-phpunit and core agree.
+            ms_env="WP_TESTS_MULTISITE=1 WP_MULTISITE=1"
+          fi
+          # Composer ran on the host, so vendor/ is already mounted in the
+          # container. The plugin's phpunit.xml.dist owns the bootstrap.
+          npx wp-env run tests-cli \
+            --env-cwd=wp-content/plugins/rtcamp-amc-copilot \
+            -- sh -c "${ms_env} vendor/bin/phpunit -c phpunit.xml.dist"
+
+      - name: Stop wp-env
+        if: always()
+        run: npx wp-env stop --config=.wp-env.ci.json || true
+
+  # ---------------------------------------------------------------------------
+  # JavaScript: ESLint (@wordpress/eslint-plugin comes in through the plugin's
+  # eslint config / @wordpress/scripts) and the production build.
+  # ---------------------------------------------------------------------------
+  js:
+    name: JS lint & build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: plugins/rtcamp-amc-copilot
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: plugins/rtcamp-amc-copilot/package-lock.json
+
+      - name: Install npm dependencies
+        run: npm ci --no-audit --no-fund
+
+      # `lint:js` is @wordpress/scripts' lint-js, which loads
+      # @wordpress/eslint-plugin through the plugin's flat ESLint config.
+      - name: ESLint
+        run: npm run lint:js
+
+      - name: Build
+        run: npm run build
+
+  # ---------------------------------------------------------------------------
+  # End-to-end tests: Playwright against the wp-env development site.
+  # ---------------------------------------------------------------------------
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: plugins/rtcamp-amc-copilot
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: plugins/rtcamp-amc-copilot/package-lock.json
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('plugins/rtcamp-amc-copilot/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install npm dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Start wp-env
+        run: npx wp-env start
+
+      - name: Run Playwright tests
+        env:
+          CI: 'true'
+          WP_BASE_URL: http://localhost:8888
+        run: npx playwright test
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            plugins/rtcamp-amc-copilot/playwright-report/
+            plugins/rtcamp-amc-copilot/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Stop wp-env
+        if: always()
+        run: npx wp-env stop || true
+
+  # ---------------------------------------------------------------------------
+  # VIP code analysis.
+  #
+  # automattic/vip-go-ci needs a VIP API token and a GitHub review context, so
+  # it cannot run unattended on this repository yet. The stand-in is PHPCS with
+  # automattic/vipwpcs (WordPressVIPMinimum + WordPress-VIP-Go), which is the
+  # same rule set vip-go-ci reports from. Swap this job for vip-go-ci once the
+  # repo is connected to VIP and a token is available to the workflow.
+  # ---------------------------------------------------------------------------
+  vip-scan:
+    name: VIP scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: plugins/rtcamp-amc-copilot
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/composer
+            ~/.composer/cache
+          key: ${{ runner.os }}-composer-${{ hashFiles('plugins/rtcamp-amc-copilot/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Run VIP code analysis
+        run: |
+          set -euo pipefail
+          targets=(inc)
+          if [ -f rtcamp-amc-copilot.php ]; then
+            targets+=(rtcamp-amc-copilot.php)
+          fi
+          {
+            echo "### VIP scan"
+            echo ""
+            echo "automattic/vip-go-ci is not runnable here (it needs a VIP API"
+            echo "token and PR review context). Running WordPressVIPMinimum and"
+            echo "WordPress-VIP-Go from automattic/vipwpcs via PHPCS instead."
+          } >> "$GITHUB_STEP_SUMMARY"
+          vendor/bin/phpcs -p --standard=WordPressVIPMinimum --extensions=php "${targets[@]}"
+          vendor/bin/phpcs -p --standard=WordPress-VIP-Go --extensions=php "${targets[@]}"
