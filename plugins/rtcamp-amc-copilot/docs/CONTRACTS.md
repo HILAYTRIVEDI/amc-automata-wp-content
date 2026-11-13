@@ -321,7 +321,7 @@ Anonymous requests get 401; logged-in users without the capability get 403.
 | GET | `/smoke` | E | B2 | Stub | – | `{ last_run, urls: [{ url, required_text, is_default, last_status ('pass'\|'fail'\|'loopback_blocked'\|null), last_http_code, last_response_ms, pass_rate_30d, trend: [{ at, ms, ok }] }] }` |
 | GET | `/errors` | E | A1 | Live | `type, days` | `[{ signature, type, message, source, file, line, count, first_seen, last_seen, sparkline: int[days], finding_id, finding_status }]` |
 | GET | `/changes` | E | A1 | Live | `type, action, source, since, until, page, per_page` | `[{ id, type, action, item, item_name, old_version, new_version, source, user_id, user_display_name, created_at }]` + headers |
-| POST | `/notify/test` | E | A2 | 501 | `{ type: immediate\|digest }` | `{ sent: bool, recipients: string[] }` |
+| POST | `/notify/test` | E | A2 | Live | `{ type: immediate\|digest }` | `{ sent: bool, recipients: string[] }`; 503 `amc_disabled` while the kill switch is on |
 | GET | `/reports` | R | D1 | Live | `status (any\|draft\|publish), page, per_page` | `Report[]` (non-engineers get published only) |
 | POST | `/reports/generate` | E | D1 | 501 | `{ period_type: month\|quarter\|year\|custom, start?, end? }` | 201 `Report` |
 | POST | `/reports/{id}/regenerate` | E | D1 | 501 | – | `Report` (keeps engineer fields, overrides, custom sections) |
@@ -477,6 +477,10 @@ Rules:
 | `amc_vulnerability_provider` | filter | `Providers::current()` | `ProviderInterface $provider` | rtCamp CVE plugin, B2 FixtureProvider in tests |
 | `amc_findings_processed` | action | `Runner` after every successful run | `ProcessedFindings $processed` | A2 Notify |
 | `amc_run_completed` | action | `Runner` after any run (including `error`) | `array $run_row` | C (optional), A2 |
+| `amc_alert_rules` | filter | `AlertRules::table()` | `array<check_id, 'immediate'\|'digest'\|'none'\|callable( array $finding ): string> $rules` | Sites, other lanes |
+| `amc_notify_finding_url` | filter | `Mailer::finding_url()` | `string $url, array $finding` | C (console deep link) |
+| `amc_report_email` | filter | `Mailer::send_report_*()` | `array $content, 'draft_ready'\|'published' $event, WP_Post $report` | D1 (email content) |
+| `amc_report_published_recipients` | filter | `Mailer::send_report_published()` | `list<string> $emails, WP_Post $report` | D1 |
 | `amc_scheduler_time_budget` | filter | `Scheduler::tick()` | `int $seconds` (25) | Hosts with long cron windows |
 | `amc_activate` | action | Plugin activation | – | Lanes scheduling their own cron events |
 | `amc_deactivate` | action | Deactivation and uninstall | – | Lanes clearing their cron events |
@@ -486,7 +490,7 @@ Rules:
 Cron events lanes will add (names reserved):
 
 - `amc_retention` (A1, daily)
-- `amc_digest` (A2, daily at `digest_time`)
+- `amc_digest` (A2, single event at the next `digest_time` in site time, rescheduled after each run so it survives DST)
 - `amc_report_monthly`, `amc_report_quarterly`, `amc_report_annual` (D1)
 
 ## 15. WP-CLI

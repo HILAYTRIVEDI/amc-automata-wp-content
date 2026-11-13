@@ -16,8 +16,9 @@ use rtCamp\WPPrimitives\Contracts\Abstracts\AbstractModule;
  *
  * Owner: lane A2. Only A2 edits this file.
  *
- * Add AlertRules, Mailer and Digest here. Listen to the
- * `amc_findings_processed` action (payload: AMC\Runner\ProcessedFindings).
+ * Alerts listens to `amc_findings_processed` (payload: AMC\Runner\ProcessedFindings)
+ * and sends immediate alerts; Digest owns the daily cron event. AlertRules,
+ * Throttle, Mailer and EmailRenderer are plain helpers used by both.
  *
  * @since 0.1.0
  */
@@ -27,6 +28,9 @@ final class NotifyModule extends AbstractModule {
 	 * {@inheritDoc}
 	 */
 	protected function get_classes(): array {
-		return [];
+		return [
+			Alerts::class,
+			Digest::class,
+		];
 	}
 }
