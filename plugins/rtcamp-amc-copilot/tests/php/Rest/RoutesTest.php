@@ -26,32 +26,34 @@ final class RoutesTest extends TestCase {
 	 * Every route of the frozen route map => methods. Mirrors docs/CONTRACTS.md § REST.
 	 */
 	private const ROUTES = [
-		'/amc/v1/overview'                       => [ 'GET' ],
-		'/amc/v1/checks'                         => [ 'GET' ],
-		'/amc/v1/checks/run'                     => [ 'POST' ],
-		'/amc/v1/runs'                           => [ 'GET' ],
-		'/amc/v1/runs/(?P<id>\d+)'               => [ 'GET' ],
-		'/amc/v1/runs/(?P<id>\d+)/rerun'         => [ 'POST' ],
-		'/amc/v1/findings'                       => [ 'GET' ],
-		'/amc/v1/findings/(?P<id>\d+)'           => [ 'GET' ],
-		'/amc/v1/findings/(?P<id>\d+)/status'    => [ 'POST' ],
-		'/amc/v1/settings'                       => [ 'GET', 'POST' ],
-		'/amc/v1/access'                         => [ 'GET', 'POST' ],
-		'/amc/v1/access/(?P<user_id>\d+)'        => [ 'DELETE' ],
-		'/amc/v1/updates'                        => [ 'GET' ],
-		'/amc/v1/inventory'                      => [ 'GET' ],
-		'/amc/v1/vulnerabilities'                => [ 'GET' ],
-		'/amc/v1/security'                       => [ 'GET' ],
-		'/amc/v1/performance'                    => [ 'GET' ],
-		'/amc/v1/smoke'                          => [ 'GET' ],
-		'/amc/v1/errors'                         => [ 'GET' ],
-		'/amc/v1/changes'                        => [ 'GET' ],
-		'/amc/v1/notify/test'                    => [ 'POST' ],
-		'/amc/v1/reports'                        => [ 'GET' ],
-		'/amc/v1/reports/generate'               => [ 'POST' ],
-		'/amc/v1/reports/(?P<id>\d+)/regenerate' => [ 'POST' ],
-		'/amc/v1/reports/(?P<id>\d+)/snapshot'   => [ 'GET' ],
-		'/amc/v1/saved-fields'                   => [ 'GET', 'POST' ],
+		'/amc/v1/overview'                           => [ 'GET' ],
+		'/amc/v1/checks'                             => [ 'GET' ],
+		'/amc/v1/checks/run'                         => [ 'POST' ],
+		'/amc/v1/runs'                               => [ 'GET' ],
+		'/amc/v1/runs/(?P<id>\d+)'                   => [ 'GET' ],
+		'/amc/v1/runs/(?P<id>\d+)/rerun'             => [ 'POST' ],
+		'/amc/v1/findings'                           => [ 'GET' ],
+		'/amc/v1/findings/(?P<id>\d+)'               => [ 'GET' ],
+		'/amc/v1/findings/(?P<id>\d+)/status'        => [ 'POST' ],
+		'/amc/v1/settings'                           => [ 'GET', 'POST' ],
+		'/amc/v1/access'                             => [ 'GET', 'POST' ],
+		'/amc/v1/access/(?P<user_id>\d+)'            => [ 'DELETE' ],
+		'/amc/v1/updates'                            => [ 'GET' ],
+		'/amc/v1/inventory'                          => [ 'GET' ],
+		'/amc/v1/vulnerabilities'                    => [ 'GET' ],
+		'/amc/v1/vulnerabilities/(?P<id>\d+)/accept' => [ 'POST' ],
+		'/amc/v1/security'                           => [ 'GET' ],
+		'/amc/v1/performance'                        => [ 'GET' ],
+		'/amc/v1/smoke'                              => [ 'GET' ],
+		'/amc/v1/smoke/urls'                         => [ 'POST' ],
+		'/amc/v1/errors'                             => [ 'GET' ],
+		'/amc/v1/changes'                            => [ 'GET' ],
+		'/amc/v1/notify/test'                        => [ 'POST' ],
+		'/amc/v1/reports'                            => [ 'GET' ],
+		'/amc/v1/reports/generate'                   => [ 'POST' ],
+		'/amc/v1/reports/(?P<id>\d+)/regenerate'     => [ 'POST' ],
+		'/amc/v1/reports/(?P<id>\d+)/snapshot'       => [ 'GET' ],
+		'/amc/v1/saved-fields'                       => [ 'GET', 'POST' ],
 	];
 
 	/**
@@ -180,10 +182,11 @@ final class RoutesTest extends TestCase {
 		$this->assertSame( 501, $this->request( 'POST', '/amc/v1/saved-fields', [ 'fields' => [ 'x' => 1 ] ] )->get_status() );
 	}
 
-	public function test_stub_reads_are_marked(): void {
+	public function test_lane_b2_screens_are_no_longer_stubs(): void {
 		wp_set_current_user( $this->engineer );
 
-		$this->assertSame( 'B2', $this->request( 'GET', '/amc/v1/smoke' )->get_headers()['X-AMC-Stub'] );
+		$this->assertArrayNotHasKey( 'X-AMC-Stub', $this->request( 'GET', '/amc/v1/smoke' )->get_headers() );
+		$this->assertArrayNotHasKey( 'X-AMC-Stub', $this->request( 'GET', '/amc/v1/performance' )->get_headers() );
 	}
 
 	public function test_settings_update_needs_manage_options(): void {

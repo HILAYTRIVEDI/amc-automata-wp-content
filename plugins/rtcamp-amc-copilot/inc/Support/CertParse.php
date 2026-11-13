@@ -51,7 +51,7 @@ final class CertParse {
 	 * @param array<string, mixed> $parsed_cert openssl_x509_parse() output.
 	 * @param DateTimeImmutable    $now         Reference time.
 	 *
-	 * @return array{issuer: string, subject_cn: string, sans: string[], valid_from: DateTimeImmutable|null, valid_to: DateTimeImmutable|null, days_left: int, expired: bool, expiring_soon: bool}
+	 * @return array{issuer: string, subject_cn: string, serial: string, sans: string[], valid_from: DateTimeImmutable|null, valid_to: DateTimeImmutable|null, days_left: int, expired: bool, expiring_soon: bool}
 	 *
 	 * @throws \InvalidArgumentException When the validity timestamps are missing.
 	 */
@@ -76,6 +76,7 @@ final class CertParse {
 		return [
 			'issuer'        => $issuer_cn,
 			'subject_cn'    => $subject_cn,
+			'serial'        => self::serial( $parsed_cert ),
 			'sans'          => self::parse_sans( (string) ( $parsed_cert['extensions']['subjectAltName'] ?? '' ) ),
 			'valid_from'    => $valid_from,
 			'valid_to'      => $valid_to,
@@ -83,6 +84,25 @@ final class CertParse {
 			'expired'       => $expired,
 			'expiring_soon' => ! $expired && $days_left <= self::EXPIRING_SOON_DAYS,
 		];
+	}
+
+	/**
+	 * The certificate serial number (hex when available), '' when unknown.
+	 *
+	 * A renewed certificate gets a new serial, so this identifies "this cert".
+	 *
+	 * @param array<string, mixed> $parsed_cert openssl_x509_parse() output.
+	 */
+	private static function serial( array $parsed_cert ): string {
+		foreach ( [ 'serialNumberHex', 'serialNumber' ] as $key ) {
+			$value = $parsed_cert[ $key ] ?? null;
+
+			if ( is_scalar( $value ) && '' !== trim( (string) $value ) ) {
+				return strtoupper( trim( (string) $value ) );
+			}
+		}
+
+		return '';
 	}
 
 	/**

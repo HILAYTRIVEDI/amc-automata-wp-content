@@ -315,10 +315,12 @@ Anonymous requests get 401; logged-in users without the capability get 403.
 | DELETE | `/access/{user_id}` | A | W0 | Live | – | `{ revoked: true, user_id }`; 400 on self-revoke |
 | GET | `/updates` | E | B1 | Live (generic) | – | `{ checks: { 'updates.core'\|'updates.plugins'\|'updates.themes'\|'updates.php'\|'updates.readiness': LatestResult\|null } }` |
 | GET | `/inventory` | E | B1 | Live (generic) | – | `{ checks: { 'inventory.*', 'hosting.platform', 'detect.*': LatestResult\|null } }` |
-| GET | `/vulnerabilities` | E | B2 | Live | `status (…\|all)` | `{ provider: { id, ready, last_error }, last_run: LatestResult\|null, findings: Finding[] }` |
-| GET | `/security` | E | B2 | Live (generic) | – | `{ checks: { 'security.checksums'\|'security.config'\|'security.admins'\|'ssl.certificate': LatestResult\|null } }` |
-| GET | `/performance` | E | B2 | Stub (`response_trend`) | `days` (1–90) | `{ checks: {perf.*}, response_trend: [{ date, avg_ms, url_count }], slow_queries: [{ signature, sql_sample, caller, count, max_ms, avg_ms, last_seen }] }` |
-| GET | `/smoke` | E | B2 | Stub | – | `{ last_run, urls: [{ url, required_text, is_default, last_status ('pass'\|'fail'\|'loopback_blocked'\|null), last_http_code, last_response_ms, pass_rate_30d, trend: [{ at, ms, ok }] }] }` |
+| GET | `/vulnerabilities` | E | B2 | Live | `status (…\|all)` | `{ provider: { id, ready, last_error }, last_run: LatestResult\|null, findings: Finding[], counts: { open: { critical, high, medium, low, info }, accepted } }` |
+| POST | `/vulnerabilities/{id}/accept` | E | B2 | Live | `{ note }` (required) | `Finding` (accept risk of a `vuln.match` finding with a note; 404 for other checks) |
+| GET | `/security` | E | B2 | Live | – | `{ checks: { 'security.checksums'\|'security.config'\|'security.admins'\|'ssl.certificate': LatestResult\|null }, open_findings: Finding[] }` |
+| GET | `/performance` | E | B2 | Live | `days` (1–90) | `{ checks: {perf.*}, response_trend: [{ date, avg_ms, url_count }], slow_queries: [{ signature, sql_sample, caller, count, max_ms, avg_ms, last_seen }] }` |
+| GET | `/smoke` | E | B2 | Live | – | `{ last_run, urls: [{ url, required_text, is_default, last_status ('pass'\|'fail'\|'loopback_blocked'\|null), last_http_code, last_response_ms, pass_rate_30d, trend: [{ at, ms, ok }] }] }` |
+| POST | `/smoke/urls` | E | B2 | Live | `{ url, required_text? }` | `{ urls: [{ url, required_text }] }` (adds an extra URL or edits its required text; engineers, unlike `POST /settings`; max 25) |
 | GET | `/errors` | E | A1 | Live | `type, days` | `[{ signature, type, message, source, file, line, count, first_seen, last_seen, sparkline: int[days], finding_id, finding_status }]` |
 | GET | `/changes` | E | A1 | Live | `type, action, source, since, until, page, per_page` | `[{ id, type, action, item, item_name, old_version, new_version, source, user_id, user_display_name, created_at }]` + headers |
 | POST | `/notify/test` | E | A2 | Live | `{ type: immediate\|digest }` | `{ sent: bool, recipients: string[] }`; 503 `amc_disabled` while the kill switch is on |
