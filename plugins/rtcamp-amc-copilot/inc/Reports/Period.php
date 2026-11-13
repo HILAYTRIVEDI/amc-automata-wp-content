@@ -72,7 +72,7 @@ final class Period {
 	 */
 	public function __construct( string $type, DateTimeImmutable $start, DateTimeImmutable $end, string $label ) {
 		if ( ! in_array( $type, [ self::TYPE_MONTH, self::TYPE_QUARTER, self::TYPE_YEAR, self::TYPE_CUSTOM ], true ) ) {
-			throw new \InvalidArgumentException( sprintf( 'Unknown period type "%s".', $type ) );
+			throw new \InvalidArgumentException( esc_html( sprintf( 'Unknown period type "%s".', $type ) ) );
 		}
 
 		if ( $start > $end ) {
