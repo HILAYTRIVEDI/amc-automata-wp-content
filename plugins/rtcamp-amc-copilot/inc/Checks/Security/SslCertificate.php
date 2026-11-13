@@ -266,7 +266,7 @@ final class SslCertificate implements Check {
 
 		$errno  = 0;
 		$errstr = '';
-		$client = @stream_socket_client( // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- A failed connection is reported through $errstr.
+		$client = @stream_socket_client( // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged,Generic.PHP.NoSilencedErrors.Forbidden -- A failed connection is reported through $errstr.
 			'ssl://' . $host . ':' . $port,
 			$errno,
 			$errstr,
