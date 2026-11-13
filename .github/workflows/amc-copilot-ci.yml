@@ -168,7 +168,8 @@ jobs:
   # `wp-env run cli` for WP-CLI (generate and publish reports, grant roles).
   e2e:
     name: E2E (Playwright)
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest is 26.04, which Playwright's browser install does not support yet.
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
