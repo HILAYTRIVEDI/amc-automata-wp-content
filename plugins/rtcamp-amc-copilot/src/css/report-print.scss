@@ -1,0 +1,60 @@
+@page {
+	size: a4;
+	margin: 18mm 15mm 20mm;
+
+	@bottom-center {
+		content: "Page " counter( page ) " of " counter( pages );
+		font-size: 9pt;
+		color: currentcolor;
+	}
+}
+
+@media print {
+
+	.amc-report-page {
+
+		#wpadminbar,
+		#adminmenumain,
+		#wpfooter,
+		.amc-no-print {
+			display: none !important;
+		}
+
+		#wpcontent,
+		#wpbody-content {
+			margin-inline-start: 0 !important;
+			padding-inline-start: 0 !important;
+		}
+	}
+
+	.amc-section {
+		break-inside: avoid;
+		break-inside: avoid;
+	}
+
+	.amc-section > .wp-block-heading,
+	.amc-section > h2 {
+		break-after: avoid;
+		break-after: avoid;
+	}
+
+	.amc-section figure.wp-block-table tr:first-child {
+		break-before: avoid;
+		break-before: avoid;
+	}
+
+	.amc-section figure.wp-block-table tr {
+		break-inside: avoid;
+		break-inside: avoid;
+	}
+
+	.amc-edited-badge,
+	.amc-override-control {
+		display: none !important;
+	}
+
+	.amc-disclaimer {
+		font-size: 9pt;
+		font-style: italic;
+	}
+}

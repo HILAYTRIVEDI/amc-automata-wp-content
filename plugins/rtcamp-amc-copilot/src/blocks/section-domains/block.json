@@ -1,0 +1,66 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "amc/section-domains",
+	"version": "0.1.0",
+	"title": "Report section: Domains",
+	"category": "widgets",
+	"icon": "media-document",
+	"description": "Domains section of the maintenance report.",
+	"keywords": [
+		"amc",
+		"report"
+	],
+	"textdomain": "rtcamp-amc-copilot",
+	"usesContext": [
+		"postId",
+		"postType"
+	],
+	"attributes": {
+		"lock": {
+			"type": "object",
+			"default": {
+				"move": true,
+				"remove": true
+			}
+		},
+		"hidden": {
+			"type": "boolean",
+			"default": false
+		},
+		"overrides": {
+			"type": "object",
+			"default": {}
+		},
+		"engineer": {
+			"type": "object",
+			"default": {}
+		}
+	},
+	"supports": {
+		"html": false,
+		"multiple": false,
+		"reusable": false,
+		"inserter": false,
+		"lock": false,
+		"color": {
+			"background": true,
+			"text": true
+		},
+		"spacing": {
+			"margin": true,
+			"padding": true
+		},
+		"typography": {
+			"fontSize": true
+		},
+		"__experimentalBorder": {
+			"color": true,
+			"radius": true,
+			"style": true,
+			"width": true
+		}
+	},
+	"editorScript": "file:./index.js",
+	"editorStyle": "file:./index.css"
+}
