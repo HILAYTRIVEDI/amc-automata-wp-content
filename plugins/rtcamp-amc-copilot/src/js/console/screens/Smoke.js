@@ -44,7 +44,7 @@ const statusLabel = ( item ) =>
  * @param {(...args: unknown[]) => unknown} props.onSaved    Called after saving.
  * @return {Element} Form.
  */
-function UrlForm( { item, closeModal, onSaved } ) {
+export function UrlForm( { item, closeModal, onSaved } ) {
 	const [ url, setUrl ] = useState( item?.url ?? '' );
 	const [ requiredText, setRequiredText ] = useState(
 		item?.required_text ?? ''
@@ -98,9 +98,11 @@ function UrlForm( { item, closeModal, onSaved } ) {
 				required
 				ref={ urlInput }
 				aria-invalid={ ! editing && !! problem }
-				aria-describedby={
-					! editing && problem ? problemId : undefined
-				}
+				// Only override aria-describedby when there is an error, so
+				// TextControl keeps linking its help text otherwise.
+				{ ...( ! editing && problem
+					? { 'aria-describedby': problemId }
+					: {} ) }
 				help={
 					editing
 						? __(

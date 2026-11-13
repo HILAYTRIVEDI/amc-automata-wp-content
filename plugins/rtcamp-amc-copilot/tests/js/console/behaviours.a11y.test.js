@@ -416,6 +416,30 @@ describeWithDom( 'Console accessibility behaviours', () => {
 			);
 			await unmount();
 		} );
+
+		it( 'keeps the URL help text linked to the field when editing', async () => {
+			const {
+				UrlForm,
+			} = require( '../../../src/js/console/screens/Smoke' );
+			const { container, unmount } = await render(
+				<UrlForm
+					item={ {
+						url: 'https://example-client.com/',
+						required_text: '',
+					} }
+					closeModal={ () => {} }
+					onSaved={ () => {} }
+				/>
+			);
+			const url = container.querySelector( 'input[type="url"]' );
+			const describedBy = url.getAttribute( 'aria-describedby' );
+
+			expect( describedBy ).toBeTruthy();
+			expect(
+				document.getElementById( describedBy ).textContent
+			).toContain( 'The URL cannot be changed' );
+			await unmount();
+		} );
 	} );
 
 	describe( 'App', () => {
