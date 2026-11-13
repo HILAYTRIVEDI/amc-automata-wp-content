@@ -1,0 +1,21 @@
+{
+	"name": "AMC Copilot",
+	"kind": "plugin",
+	"version": "1.0.0",
+	"slug": "rtcamp-amc-copilot",
+	"textDomain": "rtcamp-amc-copilot",
+	"package": "rtcamp/rtcamp-amc-copilot",
+	"namespace": "AMC",
+	"functionPrefix": "amc_",
+	"constantPrefix": "AMC_COPILOT",
+	"cssPrefix": "amc-",
+	"features": {
+		"tailwind": false,
+		"hmr": true
+	},
+	"generatedBy": "@rtcamp/wp-tooling init",
+	"examples": {
+		"removed": ["post-types","taxonomies","blocks","shortcodes","rest","cli","cron","settings","admin","roles","cache","transients"]
+	},
+	"generatedAt": "2026-11-13T17:57:07.729Z"
+}
