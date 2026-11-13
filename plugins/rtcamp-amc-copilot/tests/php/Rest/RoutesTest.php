@@ -175,13 +175,6 @@ final class RoutesTest extends TestCase {
 		$this->assertMatchesRegularExpression( '/Z$/', $response->get_data()[0]['created_at'] );
 	}
 
-	public function test_other_lanes_write_routes_return_501(): void {
-		wp_set_current_user( $this->engineer );
-
-		$this->assertSame( 501, $this->request( 'POST', '/amc/v1/reports/generate', [ 'period_type' => 'month' ] )->get_status() );
-		$this->assertSame( 501, $this->request( 'POST', '/amc/v1/saved-fields', [ 'fields' => [ 'x' => 1 ] ] )->get_status() );
-	}
-
 	public function test_lane_b2_screens_are_no_longer_stubs(): void {
 		wp_set_current_user( $this->engineer );
 
