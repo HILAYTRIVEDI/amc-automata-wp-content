@@ -93,6 +93,12 @@ final class AlertRulesTest extends TestCase {
 		$this->assertSame( $expected, $actual );
 	}
 
+	public function test_site_health_findings_are_digest_only_whatever_their_severity(): void {
+		foreach ( [ 'low', 'medium', 'high', 'critical' ] as $severity ) {
+			$this->assertSame( 'digest', AlertRules::route( $this->row( 'health.site_health', $severity ) ), $severity );
+		}
+	}
+
 	public function test_vulnerability_high_and_critical_are_immediate_others_digest(): void {
 		$this->assertSame( 'immediate', AlertRules::route( $this->row( 'vuln.match', 'critical' ) ) );
 		$this->assertSame( 'immediate', AlertRules::route( $this->row( 'vuln.match', 'high' ) ) );

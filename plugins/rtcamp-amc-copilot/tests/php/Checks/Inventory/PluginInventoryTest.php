@@ -208,9 +208,17 @@ final class PluginInventoryTest extends TestCase {
 		$this->assertCount( 3, $snapshot['data']['plugins'] );
 	}
 
-	public function test_a_wp_error_from_the_api_is_not_treated_as_on_wp_org(): void {
-		$this->markTestIncomplete( 'bug: plugins_api() returns WP_Error, not false, for unknown slugs; is_object() marks it wp_org=true with no closed/abandoned detection.' );
+	public function test_a_plugin_unknown_to_wp_org_is_not_treated_as_on_wp_org(): void {
+		$result = $this->check_with( 'plugins-clean' )->run( Context::for_tests( null, self::NOW ) );
 
+		$premium = $this->row( $result->data, 'premium-tools/premium-tools.php' );
+		$this->assertFalse( $premium['wp_org'] );
+		$this->assertFalse( $premium['closed'] );
+		$this->assertNull( $premium['last_updated'] );
+		$this->assertSame( Status::PASS, $result->status );
+	}
+
+	public function test_a_generic_api_failure_is_neither_wp_org_nor_closed(): void {
 		$check = new PluginInventory(
 			static fn (): array => [
 				'premium-tools/premium-tools.php' => [
@@ -220,12 +228,109 @@ final class PluginInventoryTest extends TestCase {
 			],
 			static fn (): array => [],
 			static fn (): array => [],
-			static fn (): mixed => new \WP_Error( 'plugins_api_failed', 'Not found.' )
+			static fn (): mixed => new \WP_Error( 'plugins_api_failed', 'An unexpected error occurred.' )
+		);
+
+		$result = $check->run( Context::for_tests( null, self::NOW ) );
+
+		$this->assertFalse( $result->data['plugins'][0]['wp_org'] );
+		$this->assertFalse( $result->data['plugins'][0]['closed'] );
+		$this->assertSame( Status::PASS, $result->status );
+	}
+
+	public function test_an_unavailable_api_is_treated_as_non_wp_org(): void {
+		$check = new PluginInventory(
+			static fn (): array => [
+				'premium-tools/premium-tools.php' => [
+					'Name'    => 'Premium Tools',
+					'Version' => '2.1.0',
+				],
+			],
+			static fn (): array => [],
+			static fn (): array => [],
+			static fn (): mixed => false
 		);
 
 		$result = $check->run( Context::for_tests( null, self::NOW ) );
 
 		$this->assertFalse( $result->data['plugins'][0]['wp_org'] );
 		$this->assertSame( Status::PASS, $result->status );
+	}
+
+	/**
+	 * Run the check with the REAL plugins_api(), answering the wordpress.org request from a recorded body.
+	 *
+	 * @param string $slug Plugin slug on disk.
+	 * @param string $body Recorded api.wordpress.org response body.
+	 *
+	 * @return array<string, mixed> The plugin's row.
+	 */
+	private function row_through_the_real_plugins_api( string $slug, string $body ): array {
+		$replay = static function () use ( $body ): array {
+			return [
+				'headers'  => [],
+				'body'     => $body,
+				'response' => [
+					'code'    => 200,
+					'message' => 'OK',
+				],
+				'cookies'  => [],
+				'filename' => null,
+			];
+		};
+
+		add_filter( 'pre_http_request', $replay );
+
+		try {
+			$check  = new PluginInventory(
+				static fn (): array => [
+					$slug . '/' . $slug . '.php' => [
+						'Name'    => $slug,
+						'Version' => '1.0.0',
+					],
+				],
+				static fn (): array => [],
+				static fn (): array => []
+			);
+			$result = $check->run( Context::for_tests( null, self::NOW ) );
+		} finally {
+			remove_filter( 'pre_http_request', $replay );
+		}
+
+		return $result->data['plugins'][0];
+	}
+
+	public function test_a_closed_plugin_from_the_real_api_is_on_wp_org_and_closed(): void {
+		$body = (string) file_get_contents( __DIR__ . '/../../fixtures/inventory-plugins/api-closed.json' );
+
+		$row = $this->row_through_the_real_plugins_api( 'display-widgets', $body );
+
+		$this->assertTrue( $row['wp_org'] );
+		$this->assertTrue( $row['closed'] );
+	}
+
+	public function test_an_unknown_plugin_from_the_real_api_is_not_on_wp_org(): void {
+		$body = (string) file_get_contents( __DIR__ . '/../../fixtures/inventory-plugins/api-not-found.json' );
+
+		$row = $this->row_through_the_real_plugins_api( 'premium-tools', $body );
+
+		$this->assertFalse( $row['wp_org'] );
+		$this->assertFalse( $row['closed'] );
+	}
+
+	public function test_a_live_plugin_from_the_real_api_is_on_wp_org_with_its_last_updated(): void {
+		$body = (string) wp_json_encode(
+			[
+				'name'         => 'Akismet',
+				'slug'         => 'akismet',
+				'last_updated' => '2026-10-01 10:00am GMT',
+			]
+		);
+
+		$row = $this->row_through_the_real_plugins_api( 'akismet', $body );
+
+		$this->assertTrue( $row['wp_org'] );
+		$this->assertFalse( $row['closed'] );
+		$this->assertSame( '2026-10-01 10:00am GMT', $row['last_updated'] );
 	}
 }

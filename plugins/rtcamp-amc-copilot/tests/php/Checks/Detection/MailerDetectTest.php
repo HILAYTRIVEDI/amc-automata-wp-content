@@ -110,23 +110,15 @@ final class MailerDetectTest extends TestCase {
 		$this->assertSame( 2, $result->data['phpmailer_init_callbacks'] );
 	}
 
-	/**
-	 * Reveals a bug in the default phpmailer_init counter.
-	 *
-	 * Documents a bug; remove the mark once the counter is fixed.
-	 */
 	public function test_callbacks_sharing_one_priority_are_counted_individually(): void {
 		remove_all_actions( 'phpmailer_init' );
 		add_action( 'phpmailer_init', '__return_false' );
 		add_action( 'phpmailer_init', 'strrev' );
+		add_action( 'phpmailer_init', 'strtolower', 20 );
 
 		$result = ( new MailerDetect( static fn (): array => [], static fn (): array => [] ) )->run( Context::for_tests() );
 
-		$this->markTestIncomplete(
-			'bug: the default hooks seam counts the WP_Hook::$callbacks entries, which are keyed by priority, '
-			. 'so two callbacks on the same priority report 1. Counted: '
-			. $result->data['phpmailer_init_callbacks'] . '.'
-		);
+		$this->assertSame( 3, $result->data['phpmailer_init_callbacks'] );
 	}
 
 	public function test_result_is_json_serialisable(): void {
