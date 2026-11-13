@@ -88,7 +88,7 @@ final class Periods {
 			Period::TYPE_MONTH => self::previous_month( $local, $tz ),
 			Period::TYPE_QUARTER => self::previous_quarter( $local, $contract_start, $tz ),
 			Period::TYPE_YEAR => self::previous_year( $local, $contract_start, $tz ),
-			default => throw new \InvalidArgumentException( sprintf( 'Cannot derive a previous "%s" period.', $type ) ),
+			default => throw new \InvalidArgumentException( esc_html( sprintf( 'Cannot derive a previous "%s" period.', $type ) ) ),
 		};
 	}
 
@@ -144,7 +144,7 @@ final class Periods {
 			Period::TYPE_MONTH => self::next_monthly_run( $local, $tz ),
 			Period::TYPE_QUARTER => self::next_quarterly_run( $local, $contract_start, $tz ),
 			Period::TYPE_YEAR => self::next_annual_run( $local, $contract_start, $tz ),
-			default => throw new \InvalidArgumentException( sprintf( 'Cannot schedule a "%s" run.', $type ) ),
+			default => throw new \InvalidArgumentException( esc_html( sprintf( 'Cannot schedule a "%s" run.', $type ) ) ),
 		};
 	}
 
