@@ -16,8 +16,9 @@ use rtCamp\WPPrimitives\Contracts\Abstracts\AbstractModule;
  *
  * Owner: lane B2. Only B2 edits this file.
  *
- * Register every check (read-only) and report action as a WordPress
- * ability by extending rtCamp AbstractAbilityRegistrar / AbstractAbility.
+ * Registers every check (read-only) and the report read actions as
+ * WordPress abilities (see AbilitiesRegistrar). WordPress 6.9+; on older
+ * cores the Abilities API hooks never fire, so nothing is registered.
  *
  * @since 0.1.0
  */
@@ -27,6 +28,8 @@ final class AbilitiesModule extends AbstractModule {
 	 * {@inheritDoc}
 	 */
 	protected function get_classes(): array {
-		return [];
+		return [
+			AbilitiesRegistrar::class,
+		];
 	}
 }

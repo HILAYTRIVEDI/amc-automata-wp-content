@@ -41,6 +41,8 @@ An overridden field shows an **Edited** badge in the editor only.
 }
 ```
 
+Quarterly, annual and long custom (over 62 days) reports also carry two top-level keys, added by D1 (additive, no version bump): `totals` (`plugins_updated`, `plugins_added`, `plugins_removed`, `themes_updated`, `core_updates`, `users_added`, `users_removed`, `fatal`, `warning`, `deprecation`, `vulnerabilities_found`, `vulnerabilities_resolved`) and `monthly` (one entry per calendar month: `label`, `start`, `plugins_updated`, `plugins_added`, `plugins_removed`, `fatal`, `warning`, `deprecation`). Monthly reports have neither.
+
 Rules:
 
 - Every section key is always present, and every auto or saved field key is present in its section. A value the generator could not detect is `null`. Use `SnapshotSchema::empty_snapshot()` as the starting point.

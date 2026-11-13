@@ -43,6 +43,14 @@ abstract class TestCase extends WP_UnitTestCase {
 		add_filter(
 			'amc_register_checks',
 			static function ( array $registered ) use ( $checks ): array {
+				$ids = array_map( static fn ( \AMC\Checks\Check $check ): string => $check->id(), $checks );
+
+				// Registry keeps the first check per id, so drop the real check this one replaces.
+				$registered = array_filter(
+					$registered,
+					static fn ( $check ): bool => ! $check instanceof \AMC\Checks\Check || ! in_array( $check->id(), $ids, true )
+				);
+
 				return array_merge( $registered, $checks );
 			}
 		);

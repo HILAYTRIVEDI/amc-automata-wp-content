@@ -47,18 +47,19 @@ final class SmokeRule {
 
 	/**
 	 * Transport errors that mean the site's own host could not be reached at
-	 * all (DNS, refused, timeout, or an authentication wall), which blocks the
-	 * loopback check rather than failing the site.
+	 * all (DNS, refused, or an authentication wall), which blocks the loopback
+	 * check rather than failing the site.
+	 *
+	 * Timeouts are deliberately NOT here: a site that hangs past the request
+	 * timeout is exactly what a smoke check must report, so a timeout fails.
 	 *
 	 * @var string[]
 	 */
 	private const LOOPBACK_PATTERNS = [
 		'/curl error 6\b/i',
 		'/curl error 7\b/i',
-		'/curl error 28\b/i',
 		'/could not resolve host/i',
 		'/connection refused/i',
-		'/connection timed out/i',
 		'/\b401\b/u',
 		'/unauthorized/i',
 	];
@@ -83,7 +84,11 @@ final class SmokeRule {
 	 * @param string|null $required_text   Text that must appear in the body, or null.
 	 * @param string|null $transport_error Transport error message, or null.
 	 *
-	 * @return array{status: 'pass'|'fail'|'loopback_blocked', reasons: string[]}
+	 * `codes` are stable machine-readable reason identifiers (`http_status`,
+	 * `too_slow`, `php_error`, `required_text_missing`, `auth_wall`, `loopback`,
+	 * `transport_error`), one per entry in `reasons`, so callers can translate.
+	 *
+	 * @return array{status: 'pass'|'fail'|'loopback_blocked', reasons: string[], codes: string[]}
 	 */
 	public static function evaluate(
 		int $status,
@@ -97,32 +102,41 @@ final class SmokeRule {
 		}
 
 		$reasons = [];
+		$codes   = [];
 
 		if ( 401 === $status ) {
-			return self::blocked( [ 'HTTP 401: the site is behind basic auth or an access wall.' ] );
+			return self::blocked( [ 'HTTP 401: the site is behind basic auth or an access wall.' ], [ 'auth_wall' ] );
 		}
 
 		if ( 200 !== $status ) {
 			$reasons[] = 'HTTP status ' . $status . ', expected 200.';
+			$codes[]   = 'http_status';
 		}
 
 		if ( $seconds >= self::TIME_LIMIT_SECONDS ) {
 			$reasons[] = sprintf( 'Response took %.2fs, over the %.2fs limit.', $seconds, self::TIME_LIMIT_SECONDS );
+			$codes[]   = 'too_slow';
 		}
 
+		// PHP's html_errors wraps the labels in <b> tags ("<b>Warning</b>: ... in <b>/path</b>"); drop them so those still match.
+		$scan = preg_replace( '#</?b>#i', '', $body ) ?? $body;
+
 		foreach ( self::PHP_ERROR_PATTERNS as $label => $pattern ) {
-			if ( 1 === preg_match( $pattern, $body ) ) {
+			if ( 1 === preg_match( $pattern, $scan ) ) {
 				$reasons[] = 'PHP error text in body (' . $label . ').';
+				$codes[]   = 'php_error';
 			}
 		}
 
 		if ( null !== $required_text && '' !== trim( $required_text ) && ! str_contains( $body, $required_text ) ) {
 			$reasons[] = 'Required text not found in body.';
+			$codes[]   = 'required_text_missing';
 		}
 
 		return [
 			'status'  => [] === $reasons ? 'pass' : 'fail',
 			'reasons' => $reasons,
+			'codes'   => $codes,
 		];
 	}
 
@@ -131,18 +145,19 @@ final class SmokeRule {
 	 *
 	 * @param string $transport_error Transport error message.
 	 *
-	 * @return array{status: 'pass'|'fail'|'loopback_blocked', reasons: string[]}
+	 * @return array{status: 'pass'|'fail'|'loopback_blocked', reasons: string[], codes: string[]}
 	 */
 	private static function transport_verdict( string $transport_error ): array {
 		foreach ( self::LOOPBACK_PATTERNS as $pattern ) {
 			if ( 1 === preg_match( $pattern, $transport_error ) ) {
-				return self::blocked( [ 'Transport error indicates a blocked loopback request: ' . $transport_error ] );
+				return self::blocked( [ 'Transport error indicates a blocked loopback request: ' . $transport_error ], [ 'loopback' ] );
 			}
 		}
 
 		return [
 			'status'  => 'fail',
 			'reasons' => [ 'Transport error: ' . $transport_error ],
+			'codes'   => [ 'transport_error' ],
 		];
 	}
 
@@ -150,13 +165,15 @@ final class SmokeRule {
 	 * A loopback-blocked verdict.
 	 *
 	 * @param string[] $reasons Why the loopback is blocked.
+	 * @param string[] $codes   Reason codes.
 	 *
-	 * @return array{status: 'pass'|'fail'|'loopback_blocked', reasons: string[]}
+	 * @return array{status: 'pass'|'fail'|'loopback_blocked', reasons: string[], codes: string[]}
 	 */
-	private static function blocked( array $reasons ): array {
+	private static function blocked( array $reasons, array $codes ): array {
 		return [
 			'status'  => 'loopback_blocked',
 			'reasons' => $reasons,
+			'codes'   => $codes,
 		];
 	}
 }

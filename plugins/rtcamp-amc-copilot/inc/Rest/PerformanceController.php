@@ -16,12 +16,12 @@ use WP_REST_Response;
 /**
  * Class PerformanceController
  *
- * Owner: lane B2. `checks` and `slow_queries` work today; `response_trend`
- * is a placeholder ([]) until B2 defines perf.response data.
+ * Owner: lane B2. `response_trend` is the daily trend perf.response stored
+ * (empty until that check has run), cut to the last `days` days.
  *
  * GET /amc/v1/performance?days=30 → {
  *   checks: { 'perf.response' | 'perf.database' | 'perf.cache' | 'perf.slow_queries': { run, data } | null },
- *   response_trend: list<{ date: 'Y-m-d', avg_ms: float, url_count: int }>,   B2 fills
+ *   response_trend: list<{ date: 'Y-m-d', avg_ms: float, url_count: int }>,
  *   slow_queries: list<{ signature, sql_sample, caller, count, max_ms, avg_ms, last_seen }>
  * }
  *
@@ -77,13 +77,16 @@ final class PerformanceController extends AbstractController {
 			( new QueriesRepository() )->grouped( $since )
 		);
 
-		return $this->stub(
+		$checks = $this->latest_results( self::CHECK_IDS );
+		$trend  = (array) ( $checks['perf.response']['data']['trend'] ?? [] );
+		$first  = gmdate( 'Y-m-d', time() - ( (int) $request->get_param( 'days' ) - 1 ) * DAY_IN_SECONDS );
+
+		return new WP_REST_Response(
 			[
-				'checks'         => $this->latest_results( self::CHECK_IDS ),
-				'response_trend' => [],
+				'checks'         => $checks,
+				'response_trend' => array_values( array_filter( $trend, static fn ( $point ): bool => is_array( $point ) && (string) ( $point['date'] ?? '' ) >= $first ) ),
 				'slow_queries'   => $queries,
-			],
-			self::OWNER
+			]
 		);
 	}
 }

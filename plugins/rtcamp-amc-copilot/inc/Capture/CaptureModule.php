@@ -16,11 +16,11 @@ use rtCamp\WPPrimitives\Contracts\Abstracts\AbstractModule;
  *
  * Owner: lane A1. Only A1 edits this file.
  *
- * Add ErrorCapture, DeprecationCapture, QuerySampler and ChangeLog here.
- * Performance budget: no DB queries during the request; buffer in memory
- * (max 200 events) and write ONCE in `shutdown` through
+ * Performance budget: no DB queries during the request; events are buffered in
+ * memory (at most 200 distinct entries) and written ONCE in `shutdown` through
  * EventsRepository::upsert_many() / QueriesRepository::upsert_many().
- * Check KillSwitch::is_active() lazily at flush time.
+ * KillSwitch::is_active() is read lazily at flush time; the
+ * AMC_COPILOT_DISABLED constant also stops the hooks from being added.
  *
  * @since 0.1.0
  */
@@ -30,6 +30,11 @@ final class CaptureModule extends AbstractModule {
 	 * {@inheritDoc}
 	 */
 	protected function get_classes(): array {
-		return [];
+		return [
+			ErrorCapture::class,
+			DeprecationCapture::class,
+			QuerySampler::class,
+			ChangeLog::class,
+		];
 	}
 }

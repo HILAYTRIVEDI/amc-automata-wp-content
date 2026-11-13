@@ -315,19 +315,21 @@ Anonymous requests get 401; logged-in users without the capability get 403.
 | DELETE | `/access/{user_id}` | A | W0 | Live | – | `{ revoked: true, user_id }`; 400 on self-revoke |
 | GET | `/updates` | E | B1 | Live (generic) | – | `{ checks: { 'updates.core'\|'updates.plugins'\|'updates.themes'\|'updates.php'\|'updates.readiness': LatestResult\|null } }` |
 | GET | `/inventory` | E | B1 | Live (generic) | – | `{ checks: { 'inventory.*', 'hosting.platform', 'detect.*': LatestResult\|null } }` |
-| GET | `/vulnerabilities` | E | B2 | Live | `status (…\|all)` | `{ provider: { id, ready, last_error }, last_run: LatestResult\|null, findings: Finding[] }` |
-| GET | `/security` | E | B2 | Live (generic) | – | `{ checks: { 'security.checksums'\|'security.config'\|'security.admins'\|'ssl.certificate': LatestResult\|null } }` |
-| GET | `/performance` | E | B2 | Stub (`response_trend`) | `days` (1–90) | `{ checks: {perf.*}, response_trend: [{ date, avg_ms, url_count }], slow_queries: [{ signature, sql_sample, caller, count, max_ms, avg_ms, last_seen }] }` |
-| GET | `/smoke` | E | B2 | Stub | – | `{ last_run, urls: [{ url, required_text, is_default, last_status ('pass'\|'fail'\|'loopback_blocked'\|null), last_http_code, last_response_ms, pass_rate_30d, trend: [{ at, ms, ok }] }] }` |
+| GET | `/vulnerabilities` | E | B2 | Live | `status (…\|all)` | `{ provider: { id, ready, last_error }, last_run: LatestResult\|null, findings: Finding[], counts: { open: { critical, high, medium, low, info }, accepted } }` |
+| POST | `/vulnerabilities/{id}/accept` | E | B2 | Live | `{ note }` (required) | `Finding` (accept risk of a `vuln.match` finding with a note; 404 for other checks) |
+| GET | `/security` | E | B2 | Live | – | `{ checks: { 'security.checksums'\|'security.config'\|'security.admins'\|'ssl.certificate': LatestResult\|null }, open_findings: Finding[] }` |
+| GET | `/performance` | E | B2 | Live | `days` (1–90) | `{ checks: {perf.*}, response_trend: [{ date, avg_ms, url_count }], slow_queries: [{ signature, sql_sample, caller, count, max_ms, avg_ms, last_seen }] }` |
+| GET | `/smoke` | E | B2 | Live | – | `{ last_run, urls: [{ url, required_text, is_default, last_status ('pass'\|'fail'\|'loopback_blocked'\|null), last_http_code, last_response_ms, pass_rate_30d, trend: [{ at, ms, ok }] }] }` |
+| POST | `/smoke/urls` | E | B2 | Live | `{ url, required_text? }` | `{ urls: [{ url, required_text }] }` (adds an extra URL or edits its required text; engineers, unlike `POST /settings`; max 25) |
 | GET | `/errors` | E | A1 | Live | `type, days` | `[{ signature, type, message, source, file, line, count, first_seen, last_seen, sparkline: int[days], finding_id, finding_status }]` |
 | GET | `/changes` | E | A1 | Live | `type, action, source, since, until, page, per_page` | `[{ id, type, action, item, item_name, old_version, new_version, source, user_id, user_display_name, created_at }]` + headers |
-| POST | `/notify/test` | E | A2 | 501 | `{ type: immediate\|digest }` | `{ sent: bool, recipients: string[] }` |
+| POST | `/notify/test` | E | A2 | Live | `{ type: immediate\|digest }` | `{ sent: bool, recipients: string[] }`; 503 `amc_disabled` while the kill switch is on |
 | GET | `/reports` | R | D1 | Live | `status (any\|draft\|publish), page, per_page` | `Report[]` (non-engineers get published only) |
-| POST | `/reports/generate` | E | D1 | 501 | `{ period_type: month\|quarter\|year\|custom, start?, end? }` | 201 `Report` |
-| POST | `/reports/{id}/regenerate` | E | D1 | 501 | – | `Report` (keeps engineer fields, overrides, custom sections) |
-| GET | `/reports/{id}/snapshot` | R | D1 | Live | – | `{ id, taken_at, snapshot }` (drafts: engineers only) |
+| POST | `/reports/generate` | E | D1 | Live | `{ period_type: month\|quarter\|year\|custom, start?, end? }` (`start`: any date inside the wanted month, quarter or year; custom needs both dates) | 201 `Report`, snapshot queued (`build_status: pending`); 409 `amc_report_exists` when the period already has a report |
+| POST | `/reports/{id}/regenerate` | E | D1 | Live | – | `Report` (snapshot queued; keeps engineer fields, overrides, custom sections); 409 `amc_report_published` for a published report |
+| GET | `/reports/{id}/snapshot` | R | D1 | Live | – | `{ id, taken_at, snapshot }` (drafts: engineers only; engineers also get `saved_fields: { previous, changes }`) |
 | GET | `/saved-fields` | E | D1 | Live | – | `{ fields: { section: { field: string\|null } }, schema: { section: string[] } }` |
-| POST | `/saved-fields` | E | D1 | 501 | `{ fields }` | same as GET |
+| POST | `/saved-fields` | E | D1 | Live | `{ fields }` (partial; `null` clears a field; unknown keys ignored) | same as GET |
 
 Report editing and publishing go through the block editor and core `/wp/v2/amc-reports`. CSV export is client-side, from the loaded list.
 
@@ -347,7 +349,8 @@ Overview  { status, kill_switch, findings_by_severity: { critical, high, medium,
             counts: { plugins, plugins_active, themes, pending_updates: { core, plugins, themes, total } },
             next_runs: [{ check_id, label, next_run_at }] }
 Report    { id, title, status, report_id, period_type, period_start, period_end, environment,
-            author: { id, name }, modified, edit_url|null, view_url|null }
+            author: { id, name }, modified, edit_url|null, view_url|null,
+            build_status: 'pending'|'ready'|'failed'|'' }   (build_status added by D1)
 ```
 
 Errors: `{ code, message, data: { status, owner? } }`. Codes you will see:
@@ -406,7 +409,8 @@ Other options:
 - `engineers()` lists the users who hold `amc_manage`.
 - `on_activation()` and `remove_all()` handle install and uninstall.
 - The activating user gets `amc_manage` if nobody has it yet.
-- `ReportPostType::map_caps()` grants every `*_amc_reports` primitive to `amc_manage`. D1 adds read access for `amc_view_reports`.
+- `ReportPostType::map_caps()` grants every `*_amc_reports` primitive to `amc_manage`, and `read_amc_reports` (the post type's `read` capability, **not** core's `read`) to `amc_manage` and `amc_view_reports` holders. Core maps reading a published report to `read_amc_reports` and reading a draft to `edit_post`, so a client administrator reads published reports only and cannot open drafts or the editor. An administrator without `amc_view_reports` reads nothing.
+- `/wp/v2/amc-reports` is served by `ReportRestController`, which requires `read_amc_reports` for every read (core would otherwise serve published posts to anonymous requests).
 
 ## 11. CVE provider
 
@@ -435,8 +439,8 @@ Providers::current();   // applies the 'amc_vulnerability_provider' filter, fall
   - private, shown in admin and REST (`rest_base` `amc-reports`);
   - supports title, editor, revisions, author, custom-fields;
   - capability type `amc_report` with `map_meta_cap`;
-  - meta: `_amc_period_type`, `_amc_period_start`, `_amc_period_end`, `_amc_environment`, `_amc_snapshot` (JSON string), `_amc_snapshot_taken_at`, `_amc_report_id`;
-  - template = locked section blocks, `template_lock` false (custom sections can go anywhere).
+  - meta: `_amc_period_type`, `_amc_period_start`, `_amc_period_end`, `_amc_environment`, `_amc_snapshot` (JSON string), `_amc_snapshot_taken_at`, `_amc_report_id`, `_amc_build_status` (D1: `pending` \| `ready` \| `failed`);
+  - template = every section block in report order (built from `SnapshotSchema`), each locked, `template_lock` false (custom sections can go anywhere). D2 never needs to ask D1 to add a block: a new `SnapshotSchema` section is in the template automatically.
 - **Snapshot format:** [report-snapshot.md](report-snapshot.md) and `SnapshotSchema` (sections, fields, sources, types; `empty_snapshot()`, `for_post()`, `saved_fields()`, `fields_by_source()`).
 - **Section blocks** are dynamic. PHP renders them from snapshot + attributes (`AbstractSectionBlock`). Every one has the same four attributes: `lock`, `hidden`, `overrides`, `engineer`. Exemplar: Overview.
 
@@ -477,17 +481,30 @@ Rules:
 | `amc_vulnerability_provider` | filter | `Providers::current()` | `ProviderInterface $provider` | rtCamp CVE plugin, B2 FixtureProvider in tests |
 | `amc_findings_processed` | action | `Runner` after every successful run | `ProcessedFindings $processed` | A2 Notify |
 | `amc_run_completed` | action | `Runner` after any run (including `error`) | `array $run_row` | C (optional), A2 |
+| `amc_alert_rules` | filter | `AlertRules::table()` | `array<check_id, 'immediate'\|'digest'\|'none'\|callable( array $finding ): string> $rules` | Sites, other lanes |
+| `amc_notify_finding_url` | filter | `Mailer::finding_url()` | `string $url, array $finding` | C (console deep link) |
+| `amc_report_email` | filter | `Mailer::send_report_*()` | `array $content, 'draft_ready'\|'published' $event, WP_Post $report` | D1 (email content) |
+| `amc_report_published_recipients` | filter | `Mailer::send_report_published()` | `list<string> $emails, WP_Post $report` | D1 |
 | `amc_scheduler_time_budget` | filter | `Scheduler::tick()` | `int $seconds` (25) | Hosts with long cron windows |
 | `amc_activate` | action | Plugin activation | – | Lanes scheduling their own cron events |
 | `amc_deactivate` | action | Deactivation and uninstall | – | Lanes clearing their cron events |
 | `amc_scheduler_tick` | cron | Every 5 min | – | Scheduler |
+| `amc_report_draft_ready` | action | `Generator::build()`, after the FIRST snapshot of a report | `int $post_id` | A2 Mailer (`Mailer::send_report_draft_ready`); content from `ReportEmails::draft_ready()` |
+| `amc_report_published` | action | `ReportPublishing`, on the transition to `publish` | `int $post_id` | A2 Mailer (`Mailer::send_report_published`); content from `ReportEmails::published()` |
+| `amc_report_draft_ready_email`, `amc_report_published_email` | filter | `ReportEmails` | `array{subject,text,html,recipients} $email`, `int $post_id` | Anyone changing the email content |
+| `amc_report_snapshot` | filter | `SnapshotBuilder::build()` | `array $snapshot`, `Period $period` | Add or adjust detected values |
+| `amc_report_site_code` | filter | `Generator::site_code()` | `string $code` | The code in report IDs (`AMC-<code>-2026-10`) |
+| `amc_report_view_enqueue` | action | `ClientView`, on the read-only report screen only | `int $post_id`, `WP_Post $post` | D2: enqueue the print stylesheet and block styles |
+| `amc_report_view_toolbar` | action | `ClientView`, in the page header | `WP_Post $post` | D2: a print / Save as PDF button |
+| `amc_report_view_content` | filter | `ClientView` | `string $html`, `WP_Post $post` | D2: replace the rendered body |
 | `amc_process_queue` | cron (single) | `Runner::enqueue()` | – | Scheduler |
 
 Cron events lanes will add (names reserved):
 
 - `amc_retention` (A1, daily)
-- `amc_digest` (A2, daily at `digest_time`)
-- `amc_report_monthly`, `amc_report_quarterly`, `amc_report_annual` (D1)
+- `amc_digest` (A2, single event at the next `digest_time` in site time, rescheduled after each run so it survives DST)
+- `amc_report_monthly`, `amc_report_quarterly`, `amc_report_annual` (D1): single events, each scheduled for `Periods::next_run()` and rescheduled when it runs
+- `amc_report_build` (D1, single event, argument: report ID): builds a queued report's snapshot
 
 ## 15. WP-CLI
 
@@ -496,7 +513,7 @@ Cron events lanes will add (names reserved):
 | `wp amc check list [--format=table\|json\|csv\|yaml\|ids]` | W0 | id, group, effective schedule, enabled, last status, last run |
 | `wp amc check run <id>... [--all] [--format=…]` | W0 | Runs synchronously with trigger `cli`; exit code 1 if any run errored |
 | `wp amc access grant <user>` / `revoke <user>` | W0 | ID, login or email; logged with source `cli` |
-| `wp amc report generate [--period=month\|quarter\|year\|custom] [--start=] [--end=]` | D1 | Stub (errors until D1 implements it) |
+| `wp amc report generate [--period=month\|quarter\|year\|custom] [--start=] [--end=]` | D1 | Builds the draft and its snapshot in this process; prints the existing report instead of making a second one for the same period |
 
 ## 16. Tests and linting
 

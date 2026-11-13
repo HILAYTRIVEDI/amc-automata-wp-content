@@ -9,6 +9,7 @@ declare( strict_types = 1 );
 
 namespace AMC\Rest;
 
+use AMC\Storage\FindingsRepository;
 use WP_REST_Response;
 
 /**
@@ -47,6 +48,19 @@ final class SecurityController extends AbstractController {
 	 * GET /security.
 	 */
 	public function get_screen(): WP_REST_Response {
-		return new WP_REST_Response( [ 'checks' => $this->latest_results( self::CHECK_IDS ) ] );
+		$open = ( new FindingsRepository() )->query(
+			[
+				'check_ids' => self::CHECK_IDS,
+				'status'    => 'unresolved',
+				'per_page'  => 200,
+			]
+		);
+
+		return new WP_REST_Response(
+			[
+				'checks'        => $this->latest_results( self::CHECK_IDS ),
+				'open_findings' => array_map( static fn ( array $row ): array => self::format_finding( $row ), $open['items'] ),
+			]
+		);
 	}
 }

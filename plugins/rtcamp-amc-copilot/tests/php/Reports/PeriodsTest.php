@@ -496,6 +496,48 @@ final class PeriodsTest extends TestCase {
 	}
 
 	/**
+	 * A contract start is a calendar date: building it at UTC midnight must not
+	 * move the anchor to the previous day for a site west of UTC.
+	 */
+	public function test_contract_start_is_a_calendar_date_not_an_instant(): void {
+		$tz       = self::zone( 'America/New_York' );
+		$contract = self::instant( '2025-07-15 00:00:00' ); // UTC midnight.
+
+		$run = Periods::next_run( Period::TYPE_QUARTER, self::instant( '2026-10-01 00:00:00', 'America/New_York' ), $contract, $tz );
+
+		$this->assertSame( '2026-10-15 06:15:00', $run->format( 'Y-m-d H:i:s' ) );
+
+		$period = Periods::previous( Period::TYPE_QUARTER, $run, $contract, $tz );
+
+		$this->assertSame( '2026-07-15 00:00:00', $period->start()->format( 'Y-m-d H:i:s' ) );
+		$this->assertSame( '2026-10-14 23:59:59', $period->end()->format( 'Y-m-d H:i:s' ) );
+	}
+
+	/**
+	 * Quarterly and annual runs keep their local time across DST changes, so
+	 * the UTC instant moves while 06:15 / 06:30 site time does not.
+	 */
+	public function test_quarterly_and_annual_runs_keep_local_time_across_dst(): void {
+		$tz = self::zone( 'Europe/London' );
+
+		// 1 April is BST (UTC+1): 06:15 local is 05:15 UTC.
+		$quarterly = Periods::next_run( Period::TYPE_QUARTER, self::instant( '2026-03-15 00:00:00', 'Europe/London' ), null, $tz );
+		$this->assertSame( '2026-04-01 06:15:00', $quarterly->format( 'Y-m-d H:i:s' ) );
+		$this->assertSame( '2026-04-01 05:15:00', $quarterly->setTimezone( self::utc() )->format( 'Y-m-d H:i:s' ) );
+
+		// 1 October is still BST, 1 January is GMT: same local time, different offset.
+		$winter = Periods::next_run( Period::TYPE_QUARTER, self::instant( '2026-10-02 00:00:00', 'Europe/London' ), null, $tz );
+		$this->assertSame( '2027-01-01 06:15:00', $winter->format( 'Y-m-d H:i:s' ) );
+		$this->assertSame( '2027-01-01 06:15:00', $winter->setTimezone( self::utc() )->format( 'Y-m-d H:i:s' ) );
+
+		// An annual anniversary on the spring-forward day itself.
+		$contract = self::instant( '2024-03-29 00:00:00', 'Europe/London' );
+		$annual   = Periods::next_run( Period::TYPE_YEAR, self::instant( '2026-03-15 00:00:00', 'Europe/London' ), $contract, $tz );
+		$this->assertSame( '2026-03-29 06:30:00', $annual->format( 'Y-m-d H:i:s' ) );
+		$this->assertSame( '2026-03-29 05:30:00', $annual->setTimezone( self::utc() )->format( 'Y-m-d H:i:s' ) );
+	}
+
+	/**
 	 * UTC timezone.
 	 *
 	 * @return DateTimeZone UTC timezone.
