@@ -258,7 +258,7 @@ final class Generator implements Registrable {
 	 * @param int    $post_id Report ID.
 	 * @param string $trigger Runner trigger for the fresh checks: 'cron' | 'cli' | 'manual'.
 	 */
-	public function build( int $post_id, string $trigger = 'cron' ): true|\WP_Error {
+	public function build( int $post_id, string $trigger = 'cron' ): bool|\WP_Error {
 		$post = get_post( $post_id );
 
 		if ( ! $post instanceof WP_Post || ReportPostType::SLUG !== $post->post_type ) {
@@ -342,7 +342,7 @@ final class Generator implements Registrable {
 	 *
 	 * @return true|\WP_Error `amc_report_published` (409) for a published report.
 	 */
-	public function regenerate( int $post_id, string $trigger = 'manual' ): true|\WP_Error {
+	public function regenerate( int $post_id, string $trigger = 'manual' ): bool|\WP_Error {
 		$guard = $this->guard_regenerable( $post_id );
 
 		return $guard instanceof \WP_Error ? $guard : $this->build( $post_id, $trigger );
