@@ -23,6 +23,12 @@ namespace AMC\Checks;
  * - $data:    structured, JSON-serialisable array. Shape documented on the check class.
  * - $findings: zero or more Finding objects. A PASS result usually has none;
  *              INFO results (inventory) may carry findings too (e.g. closed plugin).
+ * - $complete: true when $findings is the FULL set for this check. The runner
+ *              resolves every open finding missing from a complete result.
+ *              A batched check that only scanned part of the site returns
+ *              ->partial(): its findings are inserted/touched, nothing is
+ *              resolved. On the final batch it returns a complete result with
+ *              every finding from the whole pass (accumulate them in $data).
  *
  * @since 0.1.0
  */
@@ -35,6 +41,7 @@ final class Result {
 	 * @param string               $summary  One line.
 	 * @param array<string, mixed> $data     Structured data.
 	 * @param list<Finding>        $findings Findings.
+	 * @param bool                 $complete Whether $findings is the full set (see class docblock).
 	 *
 	 * @throws \InvalidArgumentException When a finding is not a Finding.
 	 */
@@ -42,7 +49,8 @@ final class Result {
 		public readonly Status $status,
 		public readonly string $summary,
 		public readonly array $data = [],
-		public readonly array $findings = []
+		public readonly array $findings = [],
+		public readonly bool $complete = true
 	) {
 		foreach ( $findings as $finding ) {
 			if ( ! $finding instanceof Finding ) {
@@ -104,9 +112,20 @@ final class Result {
 	}
 
 	/**
+	 * Copy of this result marked partial (a batch of a longer scan).
+	 *
+	 * The runner will not resolve open findings that are missing from it.
+	 *
+	 * @return static
+	 */
+	public function partial(): self {
+		return new self( $this->status, $this->summary, $this->data, $this->findings, false );
+	}
+
+	/**
 	 * Array form (REST, tests).
 	 *
-	 * @return array{status: string, summary: string, data: array<string, mixed>, findings: list<array<string, mixed>>}
+	 * @return array{status: string, summary: string, data: array<string, mixed>, findings: list<array<string, mixed>>, complete: bool}
 	 */
 	public function to_array(): array {
 		return [
@@ -114,6 +133,7 @@ final class Result {
 			'summary'  => $this->summary,
 			'data'     => $this->data,
 			'findings' => array_map( static fn ( Finding $f ): array => $f->to_array(), $this->findings ),
+			'complete' => $this->complete,
 		];
 	}
 }

@@ -115,7 +115,7 @@ interface Check {
 | `Schedule` | enum (string) | `hourly`, `twicedaily`, `daily`, `weekly`, `event` (never scheduled, on demand only); `->seconds()` |
 | `Status` | enum (string) | `pass`, `warn`, `fail`, `info`; `->label()` (Pass, Warning, Failed, Info) |
 | `Severity` | enum (string) | `info`, `low`, `medium`, `high`, `critical`; `->rank()`, `->at_least( Severity )`, `->label()` |
-| `Result` | readonly value object | `status`, `summary` (one line), `data` (array, JSON), `findings` (list of `Finding`); build with `Result::pass\|warn\|fail\|info( $summary, $data = [], $findings = [] )` |
+| `Result` | readonly value object | `status`, `summary` (one line), `data` (array, JSON), `findings` (list of `Finding`); build with `Result::pass\|warn\|fail\|info( $summary, $data = [], $findings = [] )`; `complete` (bool, default true), with `->partial()` returning a copy marked incomplete for batched checks |
 | `Finding` | readonly value object | `dedupe_key` (1–191 chars), `severity`, `title`, `data`; `new Finding( 'core:6.9.2', Severity::HIGH, $title, $data )` |
 | `Context` | readonly value object | `blog_id`, `trigger` (`cron`\|`manual`\|`cli`), `run_id`, `now` (`DateTimeImmutable` UTC), `previous_data` (`?array`, this check's previous run data); `Context::for_tests( $previous, $now )` |
 | `Registry` | service | `new Registry()`; `all()`, `get( $id )`, `has( $id )`, `in_group( Group )`, `Registry::effective_schedule( $check )` |
@@ -124,7 +124,7 @@ Rules a check must follow (also in `Check.php`):
 
 1. Read only. Never `update_option()`, set transients, write files or make remote POSTs.
 2. Never call `get_current_blog_id()` or `switch_to_blog()`. The runner has already switched. Use `$ctx->blog_id`.
-3. Finish in under 20 s. Batch long work and keep a cursor in `data`, then read it back from `$ctx->previous_data`.
+3. Finish in under 20 s. Batch long work and keep a cursor in `data`, then read it back from `$ctx->previous_data`. **Every batch except the last returns `$result->partial()`**, so the runner doesn't resolve findings that belong to other batches. Accumulate the findings in `data` across batches, and on the last batch return a normal (complete) result with every finding from the whole pass. Forgetting `partial()` makes findings resolve and reopen on alternate runs, which re-sends alerts.
 4. Expected problems (API down, loopback blocked, `information_schema` restricted) are **not** exceptions. Return `INFO` or `WARN` with a clear summary. A thrown exception stores the run as `error` and leaves findings untouched.
 5. Every WordPress read you need to fake in a test goes through a constructor callable with a real default.
 6. Document the shape of `Result::$data` in the class docblock. Console (C) and the snapshot builder (D1) read it.

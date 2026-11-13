@@ -35,7 +35,7 @@ use AMC\Storage\RunsRepository;
  *   5. Call Check::run(). A throw stores the run as 'error' and stops here.
  *   6. Store status/summary/data/duration on the run row.
  *   7. Dedupe findings against unresolved rows: new -> insert, seen again
- *      -> touch, missing -> resolve.
+ *      -> touch, missing -> resolve (skipped when the Result is partial).
  *   8. do_action( 'amc_findings_processed', ProcessedFindings ).
  *   9. do_action( 'amc_run_completed', array $run_row ).
  *  10. Release the lock, restore_current_blog().
@@ -237,7 +237,7 @@ final class Runner {
 
 			$this->runs->finish( $run_id, $result->status->value, $result->summary, $result->data, self::elapsed_ms( $started ) );
 
-			$processed = $this->process_findings( $check->id(), $run_id, $blog_id, $trigger, $result->findings );
+			$processed = $this->process_findings( $check->id(), $run_id, $blog_id, $trigger, $result->findings, $result->complete );
 
 			/**
 			 * Fires after a run's findings are stored, deduplicated and resolved.
@@ -260,8 +260,9 @@ final class Runner {
 	 * @param int                       $blog_id  Site.
 	 * @param string                    $trigger  Trigger.
 	 * @param list<\AMC\Checks\Finding> $findings Findings from the Result.
+	 * @param bool                      $complete False for a partial (batched) result: nothing is resolved.
 	 */
-	private function process_findings( string $check_id, int $run_id, int $blog_id, string $trigger, array $findings ): ProcessedFindings {
+	private function process_findings( string $check_id, int $run_id, int $blog_id, string $trigger, array $findings, bool $complete = true ): ProcessedFindings {
 		$unresolved = $this->findings->unresolved_for_check( $check_id, $blog_id );
 		$new        = [];
 		$ongoing    = [];
@@ -286,7 +287,8 @@ final class Runner {
 			}
 		}
 
-		$to_resolve = array_diff_key( $unresolved, $seen );
+		// A partial result only covers part of the site, so absence proves nothing.
+		$to_resolve = $complete ? array_diff_key( $unresolved, $seen ) : [];
 		$this->findings->resolve( array_map( static fn ( array $row ): int => (int) $row['id'], array_values( $to_resolve ) ) );
 
 		$resolved = [];

@@ -109,6 +109,28 @@ final class RunnerTest extends TestCase {
 		$this->assertSame( 'test.findings', $this->processed[2]->check_id );
 	}
 
+	public function test_partial_result_never_resolves_and_final_complete_result_does(): void {
+		$a     = new Finding( 'a', Severity::HIGH, 'A' );
+		$b     = new Finding( 'b', Severity::HIGH, 'B' );
+		$check = new FakeCheck( 'test.batched', Result::fail( '', [], [ $a ] )->partial() );
+		$this->register_checks( $check );
+		$runner = new Runner();
+
+		// Batch 1 finds 'a'; batch 2 finds 'b' only: 'a' must stay open.
+		$runner->run( 'test.batched' );
+		$check->will_return( Result::fail( '', [], [ $b ] )->partial() );
+		$runner->run( 'test.batched' );
+		$this->assertCount( 0, $this->processed[1]->resolved );
+		$this->assertCount( 2, ( new FindingsRepository() )->unresolved_for_check( 'test.batched' ) );
+
+		// Final batch reports the whole pass ('b' only): now 'a' resolves, and 'b' is not re-created.
+		$check->will_return( Result::fail( '', [], [ $b ] ) );
+		$runner->run( 'test.batched' );
+		$this->assertCount( 0, $this->processed[2]->new );
+		$this->assertCount( 1, $this->processed[2]->resolved );
+		$this->assertSame( 'a', $this->processed[2]->resolved[0]['dedupe_key'] );
+	}
+
 	public function test_a_throwing_check_is_stored_as_error_and_resolves_nothing(): void {
 		$check = new FakeCheck( 'test.boom', Result::fail( '', [], [ new Finding( 'a', Severity::HIGH, 'A' ) ] ) );
 		$this->register_checks( $check );
