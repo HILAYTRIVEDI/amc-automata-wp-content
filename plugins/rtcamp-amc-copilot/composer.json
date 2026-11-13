@@ -46,7 +46,10 @@
     "autoload": {
         "psr-4": {
             "AMC\\": "inc/"
-        }
+        },
+        "files": [
+            "inc/Compat/php82-polyfills.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {
