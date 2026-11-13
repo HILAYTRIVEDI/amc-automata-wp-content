@@ -1,0 +1,49 @@
+### WordPress ###
+
+# Core
+/wordpress/
+
+# macOS/IDE
+.DS_Store
+Thumbs.db
+.idea
+.vscode
+*.sublime-project
+*.sublime-workspace
+
+# Log files
+*.log
+/tests/logs
+
+# Packages
+/vendor/
+/node_modules/
+
+# Enviroment
+.env
+.env.local
+
+# Build
+assets/build/
+
+# Release zips written by `npm run release:zip`
+/dist/
+
+# Cache
+.phpunit.result.cache
+
+# Configs
+/phpcs.xml
+
+# WP ENV
+/.wp-env.override.json
+/.wp-env.tests.override.json
+
+# Tests & Coverage
+/coverage/
+.phpunit.cache/
+
+# Graphify knowledge graph: track the queryable graph + report, ignore the rest.
+/graphify-out/*
+!/graphify-out/graph.json
+!/graphify-out/GRAPH_REPORT.md

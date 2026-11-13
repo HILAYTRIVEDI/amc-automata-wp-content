@@ -1,0 +1,187 @@
+# Live Reload & Block Editor HMR
+
+This document explains how live reload and hot module replacement work in the plugin's development workflow and how to configure them for HTTPS local environments.
+
+## Overview
+
+Running `npm start` runs two scripts in parallel, each with a complementary tool:
+
+- **`start:assets` → BrowserSync** (port 3003) — live reload for the frontend via snippet mode. Your site URL stays unchanged.
+- **`start:blocks` → webpack-dev-server / Fast Refresh** (port 8886 by default, configurable via `BLOCKS_DEV_SERVER_PORT`) — hot module replacement for block editor React components. Block state is preserved across updates; no full page reload needed.
+
+For BrowserSync:
+
+- **CSS changes** inject in-place — no full page reload.
+- **PHP and JS changes** trigger a full page reload.
+
+For block editor HMR, JS/JSX changes to block components hot-swap in the editor instantly.
+
+---
+
+## Quick Start
+
+```bash
+npm start
+```
+
+Webpack starts watching for file changes and BrowserSync starts on port 3003. Open your local site and edits will reflect automatically.
+
+---
+
+## Requirements
+
+The BrowserSync client script is only enqueued when `WP_ENVIRONMENT_TYPE` is set to `local`. Add this to your `wp-config.php` if it isn't already:
+
+```php
+define( 'WP_ENVIRONMENT_TYPE', 'local' );
+```
+
+For block editor HMR (Fast Refresh), also add:
+
+```php
+define( 'SCRIPT_DEBUG', true );
+```
+
+Without `SCRIPT_DEBUG`, WordPress does not support Fast Refresh.
+
+---
+
+## How It Works
+
+**Plugin assets (`start:assets` + BrowserSync):**
+
+1. `start:assets` runs `wp-scripts start` in watch mode (no `--hot`) using `webpack.config.js`.
+2. When a file changes, webpack rebuilds the affected assets in `assets/build/`.
+3. BrowserSync detects the change and notifies the browser via the client script.
+4. CSS changes are injected in-place. Everything else triggers a full reload.
+
+**Blocks (`start:blocks` + Fast Refresh):**
+
+5. `start:blocks` runs `wp-scripts start --hot`, which starts webpack-dev-server, using `webpack.blocks.config.js`.
+6. JS/JSX changes to block components hot-swap in the editor without a full reload; block state is preserved.
+
+`webpack.blocks.config.js` is a thin wrapper over `@wordpress/scripts`' default config, which runs webpack-dev-server 6. It removes the `/build` proxy that wp-scripts adds: block HMR doesn't use it, and its target is hardcoded to `localhost:8887`, so with a custom port it would point at another server. The wrapper also sets the dev-server port from `BLOCKS_DEV_SERVER_PORT` and limits `allowedHosts` to `localhost` and `WP_HOST`.
+
+BrowserSync watches the following:
+
+- `assets/build/css/**/*.css`
+- `assets/build/js/**/*.js`
+- `**/*.php` (excluding `vendor/` and `assets/build/`)
+
+The client script is enqueued by PHP from `{scheme}://{host}:3003/browser-sync/browser-sync-client.js`. The scheme (`http` or `https`) and host are derived automatically from the WordPress site URL using `is_ssl()` and `home_url()`.
+
+BrowserSync is only added to the `scripts` webpack config. Adding it to all configs would start multiple BrowserSync instances on the same port.
+
+---
+
+## Configuration
+
+Copy `.env.local.example` to `.env.local` and set your local site hostname:
+
+```
+WP_HOST=yoursite.local
+```
+
+`WP_HOST` is your local site's hostname (without protocol or port). Set it to match your local hostname exactly. For the bundled `wp-env` site it is `localhost`, and `wp-env` already defines `WP_ENVIRONMENT_TYPE` as `local`.
+
+`.env.local` is gitignored.
+
+### Multiple sites / custom URL
+
+If port 3003 is already taken (e.g. two local sites running at once), set a different port in `.env.local`:
+
+```
+BS_PORT=3002
+```
+
+Then define the matching constant in `wp-config.php` so PHP enqueues the client from the right URL:
+
+```php
+define( 'AMC_AUTOMATA_FEATURES_FEATURES_BROWSER_SYNC_URL', 'https://yoursite.local:3002/browser-sync/browser-sync-client.js' );
+```
+
+`AMC_AUTOMATA_FEATURES_FEATURES_BROWSER_SYNC_URL` overrides the auto-detected URL entirely, so it also works for remote setups (ddev, reverse proxy) where the BrowserSync server is on a different host or IP.
+
+### Block dev server port
+
+The block Fast Refresh dev server runs on port 8886 by default. The starter theme's dev server uses 8887 and `wp-env` uses 8888 and 8889, so the plugin and theme can hot-reload at the same time. If 8886 is already in use, set another free port in `.env.local`:
+
+```
+BLOCKS_DEV_SERVER_PORT=8885
+```
+
+`webpack.blocks.config.js` reads this value and applies it to the dev server. No matching `wp-config.php` constant is needed — the editor loads block scripts from disk, and the HMR client connects to the dev server directly.
+
+### HTTPS
+
+If your local site runs on HTTPS, also add the SSL cert paths:
+
+```
+WP_SSL_KEY=/path/to/yoursite.local.key
+WP_SSL_CERT=/path/to/yoursite.local.crt
+```
+
+This is required to avoid mixed content errors — the BrowserSync client script on port 3003 must also be served over HTTPS. Since SSL certs are domain-based, the same cert your local site uses also covers port 3003.
+
+**Finding cert paths in LocalWP (macOS):**
+
+```
+~/Library/Application Support/Local/run/router/nginx/certs/<domain>.key
+~/Library/Application Support/Local/run/router/nginx/certs/<domain>.crt
+```
+
+---
+
+## Advanced
+
+### Enabling / disabling HMR
+
+HMR (BrowserSync live reload) is controlled by a single master switch in `.env.local`, honoured by both the build (BrowserSync server) and PHP (client enqueue):
+
+```
+ENABLE_HMR=false
+```
+
+Default is on — the key only needs setting to turn HMR off. Off values are `0`, `false`, `no`, and `off` (case-insensitive). With it off, `npm start` skips the BrowserSync server entirely and PHP skips the client, so there is no live reload and no console noise from a client pointing at a server that isn't running. The `browser-sync` dev dependencies stay installed, so flipping it back on needs no reinstall.
+
+You can also toggle it from `npm run init` (manage mode → Toggle features → HMR), which just flips `ENABLE_HMR` in `.env.local` for you. Since `.env.local` is gitignored, this is a per-developer local setting.
+
+### Disabling the BrowserSync client only
+
+To keep the BrowserSync server running but stop PHP from enqueuing its client (e.g. when working purely in the block editor), set this in `.env.local`:
+
+```
+DISABLE_BS=true
+```
+
+Truthy values are `1`, `true`, `yes`, and `on` (case-insensitive). This prevents PHP from enqueuing the BrowserSync client script. The BrowserSync server still starts (webpack still runs it), but the browser won't connect to it. For a full off switch (server included), use `ENABLE_HMR=false` above.
+
+### Overriding the BrowserSync client URL
+
+By default, PHP constructs the client URL from the site's scheme and host:
+
+```
+{scheme}://{host}:3003/browser-sync/browser-sync-client.js
+```
+
+To override it entirely — for a non-standard port, a remote dev server, or a reverse proxy setup — define this constant in `wp-config.php`:
+
+```php
+define( 'AMC_AUTOMATA_FEATURES_FEATURES_BROWSER_SYNC_URL', 'https://yoursite.local:3002/browser-sync/browser-sync-client.js' );
+```
+
+This takes precedence over the auto-detected URL.
+
+---
+
+## Known Limitations
+
+**BrowserSync port**: BrowserSync requires its own port (3003) separate from your local site. Snippet mode keeps the site URL unchanged — proxy mode would change the URL and break WordPress redirects and cookie domains.
+
+**WDS host validation**: WDS runs on `localhost:8886` by default. For custom local hostnames (e.g. `yoursite.local`), `webpack.blocks.config.js` sets `devServer.allowedHosts` to `localhost` plus your `WP_HOST` (rather than the blanket `all`) so the HMR WebSocket connection is accepted without exposing the dev server to DNS-rebinding.
+
+## Related
+
+- [Local development](local-development.md) — the watchers, checks and delivery build.
+- [Blocks and assets](blocks-and-assets.md) — how built files are registered and enqueued.
+- [Initialization](initialization.md#change-things-later) — toggling the `hmr` feature.

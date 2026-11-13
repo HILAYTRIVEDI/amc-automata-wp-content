@@ -1,0 +1,93 @@
+name: Documentation
+
+# Builds docs/ into a Docusaurus site with the shared rtCamp builder and
+# publishes it to GitHub Pages from the supported v2 branch. Pull requests build
+# only. Maintainer notes: docs/internal/maintenance.md#documentation-publishing
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'DEVELOPMENT.md'
+      - 'CONTRIBUTING.md'
+      - '.github/workflows/documentation.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'DEVELOPMENT.md'
+      - 'CONTRIBUTING.md'
+      - '.github/workflows/documentation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: documentation-${{ github.event_name == 'pull_request' && github.ref || 'production' }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # Generated plugins inherit this file; only the skeleton repository builds its docs site.
+    if: github.repository == 'rtCamp/plugin-elementary'
+    name: Build documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - name: Checkout documentation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Read Pages configuration
+        id: pages
+        if: >-
+          (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+          github.ref_type == 'branch' && github.ref_name == 'main'
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: Build documentation
+        id: docs
+        uses: rtCamp/action-docusaurus-build@b671d6800c68a74da8913edb9321422fe8afaedc
+        with:
+          site-title: Plugin Elementary
+          site-url: ${{ steps.pages.outputs.origin }}
+          base-url: ${{ steps.pages.outputs.base_url && format('{0}/', steps.pages.outputs.base_path) || '' }}
+          sidebar: >-
+            ["index", "getting-started", "initialization", "local-development", "features", "scaffolding", "blocks-and-assets"]
+
+      - name: Upload GitHub Pages artifact
+        if: >-
+          (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+          github.ref_type == 'branch' && github.ref_name == 'main'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: ${{ steps.docs.outputs.build-directory }}
+          include-hidden-files: true
+
+  deploy:
+    name: Deploy documentation
+    needs: build
+    if: >-
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      github.ref_type == 'branch' && github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

@@ -1,0 +1,24 @@
+# Files left out of the release zip built by `npm run release:zip`.
+# release:zip never reads .gitignore, and this list replaces its built-in
+# default list, so everything not shipped must be listed here.
+
+# Dotfiles, including .env.local and .wp-env.override.json
+/.*
+/bin/
+/coverage/
+/docs/
+/graphify-out/
+/node_modules/
+/scripts/
+/src/
+/tests/
+/*.config.js
+/*.config.mjs
+/*.dist
+/AGENTS.md
+/CLAUDE.md
+/CONTRIBUTING.md
+/DEVELOPMENT.md
+/composer.lock
+/package.json
+/package-lock.json

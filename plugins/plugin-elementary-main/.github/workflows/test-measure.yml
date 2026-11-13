@@ -1,0 +1,42 @@
+name: Test and Measure
+
+# Thin caller to rtCamp/wp-shared-workflows (scaffold: ci/test-measure).
+# Single entry point that delegates lint (CSS/JS/PHP), JS tests, the PHP x WP
+# test matrix, build, and the build-artifact gate to the wp-ci.yml
+# orchestrator; every job there is gated on detected changes, so a docs-only
+# PR runs almost nothing. Replaces the seven per-check ci-*.yml callers,
+# which could express neither the test matrix nor private-repo tokens.
+# Pinned to @v1, which moves forward to compatible v1.x releases.
+# Source: https://github.com/rtCamp/wp-shared-workflows/blob/v1/.github/workflows/wp-ci.yml
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+# Cancel previous in-flight runs of this workflow for the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    uses: rtCamp/wp-shared-workflows/.github/workflows/wp-ci.yml@v1
+    with:
+      project-type: plugin
+      php-versions: '["8.2", "8.3", "8.4"]'
+      wp-versions: '["6.7", "6.8", "6.9", "7.0", "7.1"]'
+      test-php-exclude: '[]'
+      lint-js-files-command: npm run lint:js:files
+      lint-css-files-command: npm run lint:css:files
+    # No tokens: every rtCamp dependency is public and the shared workflow falls
+    # back to GITHUB_TOKEN. A PAT here breaks all dist downloads once it expires.
