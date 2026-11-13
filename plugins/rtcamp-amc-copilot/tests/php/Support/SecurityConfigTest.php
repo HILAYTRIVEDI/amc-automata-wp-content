@@ -143,7 +143,7 @@ final class SecurityConfigTest extends TestCase {
 	 * Salts must be unique: repeated values fail with the duplicate code.
 	 */
 	public function test_duplicate_salts_fail(): void {
-		$salts                     = $this->good_salts();
+		$salts                    = $this->good_salts();
 		$salts['SECURE_AUTH_KEY'] = $salts['AUTH_KEY'];
 
 		$results = SecurityConfig::evaluate( [ 'salts' => $salts ] );
@@ -158,10 +158,21 @@ final class SecurityConfigTest extends TestCase {
 	 * With WP_DEBUG known, an undefined WP_DEBUG_DISPLAY still shows errors.
 	 */
 	public function test_wp_debug_on_with_undefined_display_fails(): void {
-		$on = SecurityConfig::evaluate( [ 'wp_debug' => true, 'salts' => $this->good_salts() ] );
+		$on = SecurityConfig::evaluate(
+			[
+				'wp_debug' => true,
+				'salts'    => $this->good_salts(),
+			]
+		);
 		$this->assertContains( 'wp_debug_display', $this->statuses_of( $on, 'fail' ) );
 
-		$off = SecurityConfig::evaluate( [ 'wp_debug' => false, 'wp_debug_display' => true, 'salts' => $this->good_salts() ] );
+		$off = SecurityConfig::evaluate(
+			[
+				'wp_debug'         => false,
+				'wp_debug_display' => true,
+				'salts'            => $this->good_salts(),
+			]
+		);
 		$this->assertContains( 'wp_debug_display', $this->statuses_of( $off, 'pass' ) );
 	}
 

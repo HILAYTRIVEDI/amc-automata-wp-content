@@ -377,8 +377,8 @@ final class SmokeUrls implements Check {
 	/**
 	 * Request one URL and fold the verdict into its state.
 	 *
-	 * @param array<string, mixed>                                  $state State so far.
-	 * @param Context                                               $ctx   Run context.
+	 * @param array<string, mixed>                                    $state State so far.
+	 * @param Context                                                 $ctx   Run context.
 	 * @param array{username: string, password: string, host: string} $auth  Credentials.
 	 *
 	 * @return array<string, mixed>
@@ -425,17 +425,17 @@ final class SmokeUrls implements Check {
 		];
 		$state['history']   = array_slice( $state['history'], -self::HISTORY_LIMIT );
 
-		$day                   = gmdate( 'Y-m-d', $ctx->now->getTimestamp() );
-		$bucket                = $state['daily'][ $day ] ?? [
+		$day                = gmdate( 'Y-m-d', $ctx->now->getTimestamp() );
+		$bucket             = $state['daily'][ $day ] ?? [
 			'n'       => 0,
 			'ok'      => 0,
 			'blocked' => 0,
 			'ms_sum'  => 0,
 			'ms_n'    => 0,
 		];
-		$bucket['n']          += 1;
-		$bucket['ok']         += 'pass' === $verdict['status'] ? 1 : 0;
-		$bucket['blocked']    += 'loopback_blocked' === $verdict['status'] ? 1 : 0;
+		$bucket['n']       += 1;
+		$bucket['ok']      += 'pass' === $verdict['status'] ? 1 : 0;
+		$bucket['blocked'] += 'loopback_blocked' === $verdict['status'] ? 1 : 0;
 		if ( $response['code'] > 0 ) {
 			$bucket['ms_sum'] += $ms;
 			$bucket['ms_n']   += 1;
@@ -451,9 +451,9 @@ final class SmokeUrls implements Check {
 	/**
 	 * Translated reasons for SmokeRule's reason codes.
 	 *
-	 * @param list<string>                                                                      $codes    Reason codes.
-	 * @param array{code: int, body: string, seconds: float, error: string|null}               $response Response.
-	 * @param array<string, mixed>                                                              $state    URL state.
+	 * @param list<string>                                                       $codes    Reason codes.
+	 * @param array{code: int, body: string, seconds: float, error: string|null} $response Response.
+	 * @param array<string, mixed>                                               $state    URL state.
 	 *
 	 * @return list<string>
 	 */
@@ -608,6 +608,9 @@ final class SmokeUrls implements Check {
 			$headers['Authorization'] = 'Basic ' . base64_encode( $auth['username'] . ':' . $auth['password'] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- HTTP Basic auth header.
 		}
 
+		// Only this site's own host may skip certificate checks (as for WordPress loopback requests); external URLs are always verified.
+		$own_host = strtolower( (string) wp_parse_url( $url, PHP_URL_HOST ) ) === strtolower( (string) wp_parse_url( home_url(), PHP_URL_HOST ) );
+		$verify   = $own_host ? (bool) apply_filters( 'https_local_ssl_verify', false ) : true; // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Core hook.
 		$start    = microtime( true );
 		$response = wp_remote_get( // phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.wp_remote_get_wp_remote_get -- Smoke checks request the site itself with a short timeout.
 			$url,
@@ -615,10 +618,7 @@ final class SmokeUrls implements Check {
 				'timeout'             => self::REQUEST_TIMEOUT,
 				'redirection'         => 3,
 				'limit_response_size' => self::MAX_BODY_BYTES,
-				// Only this site's own host may skip certificate checks (as for WordPress loopback requests); external URLs are always verified.
-				'sslverify'           => strtolower( (string) wp_parse_url( $url, PHP_URL_HOST ) ) === strtolower( (string) wp_parse_url( home_url(), PHP_URL_HOST ) )
-					? (bool) apply_filters( 'https_local_ssl_verify', false )
-					: true,
+				'sslverify'           => $verify,
 				'headers'             => $headers,
 				'user-agent'          => 'AMC-Copilot-Smoke/1.0',
 			]

@@ -1,9 +1,11 @@
 <?php
 /**
- * Fixture provider entries for the vuln.match tests.
+ * Fixture: FixtureProvider entries.
  *
  * @package AMC
  */
+
+declare( strict_types = 1 );
 
 return [
 	[

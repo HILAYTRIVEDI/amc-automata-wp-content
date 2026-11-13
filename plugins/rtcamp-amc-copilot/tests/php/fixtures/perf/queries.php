@@ -1,9 +1,11 @@
 <?php
 /**
- * Rows as QueriesRepository::grouped() returns them.
+ * Fixture: QueriesRepository::grouped() rows.
  *
  * @package AMC
  */
+
+declare( strict_types = 1 );
 
 return [
 	[

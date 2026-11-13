@@ -149,7 +149,7 @@ final class CheckAbility extends AbstractAbility {
 	 *
 	 * @param mixed $input Unused.
 	 */
-	protected function permission( mixed $input = null ): bool|\WP_Error { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found, VariableAnalysis.CodeAnalysis.VariableAnalysis.UnusedVariable -- Required by AbstractAbility.
+	protected function permission( mixed $input = null ): bool { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found, VariableAnalysis.CodeAnalysis.VariableAnalysis.UnusedVariable -- Required by AbstractAbility.
 		return current_user_can( Capabilities::MANAGE );
 	}
 

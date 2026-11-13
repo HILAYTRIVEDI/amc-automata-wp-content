@@ -249,7 +249,7 @@ final class CoreChecksumsTest extends TestCase {
 		foreach ( [ 3, 4, 5 ] as $n ) {
 			$this->clock = 0.0;
 			$runner->run( 'security.checksums' );
-			$still_open  = array_key_exists( $key, $repo->unresolved_for_check( 'security.checksums' ) );
+			$still_open = array_key_exists( $key, $repo->unresolved_for_check( 'security.checksums' ) );
 			$this->assertSame( 5 !== $n, $still_open, 'Resolved only by the final batch of the new pass (run ' . $n . ')' );
 		}
 	}

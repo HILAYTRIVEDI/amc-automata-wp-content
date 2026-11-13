@@ -10,8 +10,8 @@ declare( strict_types = 1 );
 namespace AMC\Abilities;
 
 use AMC\Core\Capabilities;
-use rtCamp\WPPrimitives\Contracts\Abstracts\AbstractAbility;
 use WP_REST_Request;
+use rtCamp\WPPrimitives\Contracts\Abstracts\AbstractAbility;
 
 /**
  * Class ReportSnapshotAbility
@@ -100,7 +100,7 @@ final class ReportSnapshotAbility extends AbstractAbility {
 	 *
 	 * @param mixed $input Unused.
 	 */
-	protected function permission( mixed $input = null ): bool|\WP_Error { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found, VariableAnalysis.CodeAnalysis.VariableAnalysis.UnusedVariable -- Required by AbstractAbility.
+	protected function permission( mixed $input = null ): bool { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found, VariableAnalysis.CodeAnalysis.VariableAnalysis.UnusedVariable -- Required by AbstractAbility.
 		return current_user_can( Capabilities::MANAGE );
 	}
 

@@ -1,9 +1,11 @@
 <?php
 /**
- * openssl_x509_parse() arrays, as functions of "now" (a Unix time) so tests control the days left.
+ * Fixture: openssl_x509_parse() builder.
  *
  * @package AMC
  */
+
+declare( strict_types = 1 );
 
 return static function ( int $now, int $days_left, string $serial = '0A1B2C', string $issuer = 'R3' ): array {
 	return [

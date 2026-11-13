@@ -114,8 +114,8 @@ final class SslCertificateTest extends TestCase {
 	 *
 	 * @dataProvider provide_boundaries
 	 *
-	 * @param int  $days        Days left.
-	 * @param bool $has_finding Whether a finding is raised.
+	 * @param int       $days        Days left.
+	 * @param bool      $has_finding Whether a finding is raised.
 	 * @param ?Severity $severity Expected severity.
 	 */
 	public function test_threshold( int $days, bool $has_finding, ?Severity $severity ): void {
@@ -136,11 +136,11 @@ final class SslCertificateTest extends TestCase {
 	 */
 	public static function provide_boundaries(): array {
 		return [
-			'15 days'      => [ 15, false, null ],
-			'14 days'      => [ 14, true, Severity::HIGH ],
-			'4 days'       => [ 4, true, Severity::HIGH ],
-			'3 days'       => [ 3, true, Severity::CRITICAL ],
-			'expired'      => [ -2, true, Severity::CRITICAL ],
+			'15 days' => [ 15, false, null ],
+			'14 days' => [ 14, true, Severity::HIGH ],
+			'4 days'  => [ 4, true, Severity::HIGH ],
+			'3 days'  => [ 3, true, Severity::CRITICAL ],
+			'expired' => [ -2, true, Severity::CRITICAL ],
 		];
 	}
 

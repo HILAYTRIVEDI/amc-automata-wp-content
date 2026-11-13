@@ -258,12 +258,13 @@ final class ConfigCheck implements Check {
 		$uploads = wp_upload_dir( null, false );
 		$url     = trailingslashit( (string) $uploads['baseurl'] );
 
+		$verify   = (bool) apply_filters( 'https_local_ssl_verify', false ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Core hook.
 		$response = wp_remote_get( // phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.wp_remote_get_wp_remote_get -- A single short request to this site's own uploads folder.
 			$url,
 			[
 				'timeout'     => 3,
 				'redirection' => 0,
-				'sslverify'   => (bool) apply_filters( 'https_local_ssl_verify', false ),
+				'sslverify'   => $verify,
 			]
 		);
 

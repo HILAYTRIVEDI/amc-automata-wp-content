@@ -1,9 +1,11 @@
 <?php
 /**
- * What get_core_checksums() returns: path => md5, for an 8-file toy core.
+ * Fixture: get_core_checksums() for a toy 8-file core.
  *
  * @package AMC
  */
+
+declare( strict_types = 1 );
 
 return [
 	'index.php'               => md5( 'index' ),

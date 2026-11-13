@@ -241,7 +241,7 @@ final class AdminSnapshot implements Check {
 	/**
 	 * A change entry, which is also the finding data.
 	 *
-	 * @param string                                                              $change added, removed or role_changed.
+	 * @param string                                                             $change added, removed or role_changed.
 	 * @param array{id: int, login: string, email: string, display_name: string} $row    The administrator.
 	 *
 	 * @return array{change: string, user_id: int, login: string, email: string}

@@ -1,9 +1,11 @@
 <?php
 /**
- * Canned smoke transport results.
+ * Fixture: canned smoke transport results.
  *
  * @package AMC
  */
+
+declare( strict_types = 1 );
 
 return [
 	'ok'        => [

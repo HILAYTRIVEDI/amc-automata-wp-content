@@ -85,6 +85,7 @@ final class VulnMatchCheckTest extends TestCase {
 	 */
 	private function failing_provider( ?string $error ): ProviderInterface {
 		return new class( $error ) implements ProviderInterface {
+
 			/**
 			 * Constructor.
 			 *
@@ -100,6 +101,15 @@ final class VulnMatchCheckTest extends TestCase {
 				return true;
 			}
 
+			/**
+			 * Match.
+			 *
+			 * @param list<Component> $components Components.
+			 *
+			 * @return list<VulnMatch>
+			 *
+			 * @throws \RuntimeException When built to throw.
+			 */
 			public function match( array $components ): array {
 				if ( '' === $this->error ) {
 					throw new \RuntimeException( 'API exploded' );
@@ -169,7 +179,7 @@ final class VulnMatchCheckTest extends TestCase {
 	}
 
 	public function test_no_matches_pass(): void {
-		$result = ( new VulnMatchCheck( new Matcher( fn (): array => [ new Component( 'plugin', 'contact-forms', '2.4.1' ) ], fn (): ProviderInterface => $this->fixture_provider() ) ) )->run( Context::for_tests() );
+		$result = ( new VulnMatchCheck( new Matcher( static fn (): array => [ new Component( 'plugin', 'contact-forms', '2.4.1' ) ], fn (): ProviderInterface => $this->fixture_provider() ) ) )->run( Context::for_tests() );
 
 		$this->assertSame( Status::PASS, $result->status );
 		$this->assertTrue( $result->complete );
@@ -200,6 +210,7 @@ final class VulnMatchCheckTest extends TestCase {
 		$this->assertSame( [], $matcher->run()['matches'] );
 
 		$liar = new class() implements ProviderInterface {
+
 			public function id(): string {
 				return 'liar';
 			}
@@ -208,6 +219,13 @@ final class VulnMatchCheckTest extends TestCase {
 				return true;
 			}
 
+			/**
+			 * Match.
+			 *
+			 * @param list<Component> $components Components.
+			 *
+			 * @return list<VulnMatch>
+			 */
 			public function match( array $components ): array {
 				return [ new VulnMatch( 'plugin', 'ghost', 'CVE-X', 'Phantom', Severity::HIGH ) ];
 			}
@@ -227,7 +245,7 @@ final class VulnMatchCheckTest extends TestCase {
 
 		$this->assertContains( 'core', $types );
 		$this->assertContains( 'theme', $types );
-		$this->assertSame( 'wordpress', $components[0]->slug );
+		$this->assertSame( 'wordpress', $components[0]->slug ); // phpcs:ignore WordPress.WP.CapitalPDangit -- The core component slug is lower case.
 		$this->assertSame( wp_get_wp_version(), $components[0]->version );
 	}
 
@@ -330,7 +348,7 @@ final class VulnMatchCheckTest extends TestCase {
 
 		// A working provider first, then a failing one via a mutable holder.
 		$holder = (object) [ 'provider' => $this->fixture_provider() ];
-		$this->replace_checks( new VulnMatchCheck( new Matcher( fn (): array => $this->inventory(), fn (): ProviderInterface => $holder->provider ) ) );
+		$this->replace_checks( new VulnMatchCheck( new Matcher( fn (): array => $this->inventory(), static fn (): ProviderInterface => $holder->provider ) ) );
 
 		$runner->run( 'vuln.match' );
 		$this->assertCount( 2, $repo->unresolved_for_check( 'vuln.match' ) );

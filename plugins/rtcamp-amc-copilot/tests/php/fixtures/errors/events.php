@@ -1,9 +1,11 @@
 <?php
 /**
- * Rows as EventsRepository::grouped() returns them, keyed by type.
+ * Fixture: EventsRepository::grouped() rows keyed by event type.
  *
  * @package AMC
  */
+
+declare( strict_types = 1 );
 
 $row = static fn ( string $type, string $signature, string $source, string $file, int $line, int $count, string $last_seen, string $message = 'Something broke' ): array => [
 	'signature'  => $signature,

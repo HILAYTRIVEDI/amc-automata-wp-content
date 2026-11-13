@@ -174,7 +174,7 @@ final class CoreChecksums implements Check {
 		$previous = $ctx->previous_data ?? [];
 
 		// Resume only an unfinished pass for the same version.
-		$resuming = false === ( $previous['done'] ?? true ) && $version === ( $previous['version'] ?? '' ) && $locale === ( $previous['locale'] ?? $locale );
+		$resuming = false === ( $previous['done'] ?? true ) && ( $previous['version'] ?? '' ) === $version && ( $previous['locale'] ?? $locale ) === $locale;
 		$sums     = ( $this->checksums_source )( $version, $locale );
 
 		if ( ! is_array( $sums ) || [] === $sums ) {

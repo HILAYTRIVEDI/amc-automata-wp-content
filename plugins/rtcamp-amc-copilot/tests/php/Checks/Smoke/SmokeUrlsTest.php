@@ -70,7 +70,7 @@ final class SmokeUrlsTest extends TestCase {
 	 * Build the check with fake URLs, transport and clock.
 	 *
 	 * @param list<array{url: string, required_text?: string, is_default?: bool}>|null $urls Rows (default: home + login).
-	 * @param array<string, string>|null                                              $auth Credentials.
+	 * @param array<string, string>|null                                               $auth Credentials.
 	 */
 	private function check( ?array $urls = null, ?array $auth = null ): SmokeUrls {
 		$urls ??= [
@@ -194,9 +194,9 @@ final class SmokeUrlsTest extends TestCase {
 
 		$first = $check->run( $this->ctx() );
 		unset( $this->scenarios[ self::HOME ] );
-		$second = $check->run( $this->ctx( $first->data, '2026-11-14 11:00:00' ) );
+		$second                        = $check->run( $this->ctx( $first->data, '2026-11-14 11:00:00' ) );
 		$this->scenarios[ self::HOME ] = 'error500';
-		$third = $check->run( $this->ctx( $second->data, '2026-11-14 12:00:00' ) );
+		$third                         = $check->run( $this->ctx( $second->data, '2026-11-14 12:00:00' ) );
 
 		$this->assertSame( Status::PASS, $second->status );
 		$this->assertSame( Status::WARN, $third->status, 'fail, pass, fail is not two in a row' );
@@ -229,7 +229,7 @@ final class SmokeUrlsTest extends TestCase {
 	}
 
 	public function test_loopback_blocked_is_its_own_status_and_not_a_failure(): void {
-		$this->scenarios[ self::HOME ]                = 'blocked';
+		$this->scenarios[ self::HOME ]                  = 'blocked';
 		$this->scenarios[ self::HOME . 'wp-login.php' ] = 'wall';
 
 		$check  = $this->check();
@@ -361,7 +361,7 @@ final class SmokeUrlsTest extends TestCase {
 
 	public function test_default_urls_are_home_login_latest_post_and_configured_urls(): void {
 		$post_id = self::factory()->post->create( [ 'post_status' => 'publish' ] );
-		( new Settings() );
+		new Settings();
 		Settings::update(
 			[
 				'smoke_urls' => [

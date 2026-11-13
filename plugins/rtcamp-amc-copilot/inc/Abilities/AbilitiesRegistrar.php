@@ -10,7 +10,6 @@ declare( strict_types = 1 );
 namespace AMC\Abilities;
 
 use AMC\Checks\Registry;
-use rtCamp\WPPrimitives\Contracts\Abstracts\AbstractAbility;
 use rtCamp\WPPrimitives\Contracts\Abstracts\AbstractAbilityRegistrar;
 
 /**
@@ -58,7 +57,7 @@ final class AbilitiesRegistrar extends AbstractAbilityRegistrar {
 	/**
 	 * Public so tests and tooling can list what would be registered.
 	 *
-	 * @return list<AbstractAbility>
+	 * @return list<\rtCamp\WPPrimitives\Contracts\Abstracts\AbstractAbility>
 	 */
 	public function list_abilities(): array {
 		return $this->abilities();
@@ -67,7 +66,7 @@ final class AbilitiesRegistrar extends AbstractAbilityRegistrar {
 	/**
 	 * {@inheritDoc}
 	 *
-	 * @return list<AbstractAbility>
+	 * @return list<\rtCamp\WPPrimitives\Contracts\Abstracts\AbstractAbility>
 	 */
 	protected function abilities(): array {
 		$abilities = [];

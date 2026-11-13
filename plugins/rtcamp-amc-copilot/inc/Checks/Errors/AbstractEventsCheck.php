@@ -112,9 +112,9 @@ abstract class AbstractEventsCheck implements Check {
 	/**
 	 * Build the result for a non-empty set of items.
 	 *
-	 * @param string                           $summary  Summary.
-	 * @param array<string, mixed>             $data     Data.
-	 * @param list<\AMC\Checks\Finding>        $findings Findings.
+	 * @param string                    $summary  Summary.
+	 * @param array<string, mixed>      $data     Data.
+	 * @param list<\AMC\Checks\Finding> $findings Findings.
 	 */
 	abstract protected function result_with_findings( string $summary, array $data, array $findings ): Result;
 
