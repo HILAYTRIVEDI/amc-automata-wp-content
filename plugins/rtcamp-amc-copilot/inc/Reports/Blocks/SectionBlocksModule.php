@@ -28,6 +28,23 @@ final class SectionBlocksModule extends AbstractModule {
 	protected function get_classes(): array {
 		return [
 			OverviewSection::class,
+			CmsSection::class,
+			ThemeSection::class,
+			PluginsThemesSection::class,
+			DatabaseBackupsSection::class,
+			UserManagementSection::class,
+			HostingSection::class,
+			DomainsSection::class,
+			SslSection::class,
+			CachingCdnSection::class,
+			SecuritySection::class,
+			FormsSection::class,
+			AnalyticsSection::class,
+			AccessibilitySection::class,
+			PhpErrorsSection::class,
+			SmokeChecksSection::class,
+			PerformanceSection::class,
+			EngineerNotesSection::class,
 		];
 	}
 }

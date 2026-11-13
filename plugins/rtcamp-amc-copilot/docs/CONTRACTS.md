@@ -315,13 +315,15 @@ Anonymous requests get 401; logged-in users without the capability get 403.
 | DELETE | `/access/{user_id}` | A | W0 | Live | – | `{ revoked: true, user_id }`; 400 on self-revoke |
 | GET | `/updates` | E | B1 | Live (generic) | – | `{ checks: { 'updates.core'\|'updates.plugins'\|'updates.themes'\|'updates.php'\|'updates.readiness': LatestResult\|null } }` |
 | GET | `/inventory` | E | B1 | Live (generic) | – | `{ checks: { 'inventory.*', 'hosting.platform', 'detect.*': LatestResult\|null } }` |
-| GET | `/vulnerabilities` | E | B2 | Live | `status (…\|all)` | `{ provider: { id, ready, last_error }, last_run: LatestResult\|null, findings: Finding[] }` |
-| GET | `/security` | E | B2 | Live (generic) | – | `{ checks: { 'security.checksums'\|'security.config'\|'security.admins'\|'ssl.certificate': LatestResult\|null } }` |
-| GET | `/performance` | E | B2 | Stub (`response_trend`) | `days` (1–90) | `{ checks: {perf.*}, response_trend: [{ date, avg_ms, url_count }], slow_queries: [{ signature, sql_sample, caller, count, max_ms, avg_ms, last_seen }] }` |
-| GET | `/smoke` | E | B2 | Stub | – | `{ last_run, urls: [{ url, required_text, is_default, last_status ('pass'\|'fail'\|'loopback_blocked'\|null), last_http_code, last_response_ms, pass_rate_30d, trend: [{ at, ms, ok }] }] }` |
+| GET | `/vulnerabilities` | E | B2 | Live | `status (…\|all)` | `{ provider: { id, ready, last_error }, last_run: LatestResult\|null, findings: Finding[], counts: { open: { critical, high, medium, low, info }, accepted } }` |
+| POST | `/vulnerabilities/{id}/accept` | E | B2 | Live | `{ note }` (required) | `Finding` (accept risk of a `vuln.match` finding with a note; 404 for other checks) |
+| GET | `/security` | E | B2 | Live | – | `{ checks: { 'security.checksums'\|'security.config'\|'security.admins'\|'ssl.certificate': LatestResult\|null }, open_findings: Finding[] }` |
+| GET | `/performance` | E | B2 | Live | `days` (1–90) | `{ checks: {perf.*}, response_trend: [{ date, avg_ms, url_count }], slow_queries: [{ signature, sql_sample, caller, count, max_ms, avg_ms, last_seen }] }` |
+| GET | `/smoke` | E | B2 | Live | – | `{ last_run, urls: [{ url, required_text, is_default, last_status ('pass'\|'fail'\|'loopback_blocked'\|null), last_http_code, last_response_ms, pass_rate_30d, trend: [{ at, ms, ok }] }] }` |
+| POST | `/smoke/urls` | E | B2 | Live | `{ url, required_text? }` | `{ urls: [{ url, required_text }] }` (adds an extra URL or edits its required text; engineers, unlike `POST /settings`; max 25) |
 | GET | `/errors` | E | A1 | Live | `type, days` | `[{ signature, type, message, source, file, line, count, first_seen, last_seen, sparkline: int[days], finding_id, finding_status }]` |
 | GET | `/changes` | E | A1 | Live | `type, action, source, since, until, page, per_page` | `[{ id, type, action, item, item_name, old_version, new_version, source, user_id, user_display_name, created_at }]` + headers |
-| POST | `/notify/test` | E | A2 | 501 | `{ type: immediate\|digest }` | `{ sent: bool, recipients: string[] }` |
+| POST | `/notify/test` | E | A2 | Live | `{ type: immediate\|digest }` | `{ sent: bool, recipients: string[] }`; 503 `amc_disabled` while the kill switch is on |
 | GET | `/reports` | R | D1 | Live | `status (any\|draft\|publish), page, per_page` | `Report[]` (non-engineers get published only) |
 | POST | `/reports/generate` | E | D1 | Live | `{ period_type: month\|quarter\|year\|custom, start?, end? }` (`start`: any date inside the wanted month, quarter or year; custom needs both dates) | 201 `Report`, snapshot queued (`build_status: pending`); 409 `amc_report_exists` when the period already has a report |
 | POST | `/reports/{id}/regenerate` | E | D1 | Live | – | `Report` (snapshot queued; keeps engineer fields, overrides, custom sections); 409 `amc_report_published` for a published report |
@@ -479,6 +481,10 @@ Rules:
 | `amc_vulnerability_provider` | filter | `Providers::current()` | `ProviderInterface $provider` | rtCamp CVE plugin, B2 FixtureProvider in tests |
 | `amc_findings_processed` | action | `Runner` after every successful run | `ProcessedFindings $processed` | A2 Notify |
 | `amc_run_completed` | action | `Runner` after any run (including `error`) | `array $run_row` | C (optional), A2 |
+| `amc_alert_rules` | filter | `AlertRules::table()` | `array<check_id, 'immediate'\|'digest'\|'none'\|callable( array $finding ): string> $rules` | Sites, other lanes |
+| `amc_notify_finding_url` | filter | `Mailer::finding_url()` | `string $url, array $finding` | C (console deep link) |
+| `amc_report_email` | filter | `Mailer::send_report_*()` | `array $content, 'draft_ready'\|'published' $event, WP_Post $report` | D1 (email content) |
+| `amc_report_published_recipients` | filter | `Mailer::send_report_published()` | `list<string> $emails, WP_Post $report` | D1 |
 | `amc_scheduler_time_budget` | filter | `Scheduler::tick()` | `int $seconds` (25) | Hosts with long cron windows |
 | `amc_activate` | action | Plugin activation | – | Lanes scheduling their own cron events |
 | `amc_deactivate` | action | Deactivation and uninstall | – | Lanes clearing their cron events |
@@ -496,7 +502,7 @@ Rules:
 Cron events lanes will add (names reserved):
 
 - `amc_retention` (A1, daily)
-- `amc_digest` (A2, daily at `digest_time`)
+- `amc_digest` (A2, single event at the next `digest_time` in site time, rescheduled after each run so it survives DST)
 - `amc_report_monthly`, `amc_report_quarterly`, `amc_report_annual` (D1): single events, each scheduled for `Periods::next_run()` and rescheduled when it runs
 - `amc_report_build` (D1, single event, argument: report ID): builds a queued report's snapshot
 

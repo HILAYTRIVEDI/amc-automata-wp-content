@@ -256,12 +256,17 @@ const styles = {
 // `modules` directory is excluded — it is built separately as ES modules below.
 const scripts = {
 	...sharedConfig,
-	entry: () =>
-		collectEntries(
+	entry: () => ( {
+		...collectEntries(
 			'./src/js',
 			[ '.js', '.jsx', '.ts', '.tsx' ],
-			[ 'modules' ]
+			[ 'modules', 'console' ]
 		),
+		// The engineer console is a multi-file app, so it is ONE entry
+		// (src/js/console/index.js -> assets/build/js/console.js) instead of
+		// one entry per file. Its CSS is extracted to assets/build/css/console.css.
+		console: path.resolve( process.cwd(), 'src/js/console/index.js' ),
+	} ),
 	plugins: [ ...sharedConfig.plugins, ...getBrowserSyncPlugins() ],
 };
 
