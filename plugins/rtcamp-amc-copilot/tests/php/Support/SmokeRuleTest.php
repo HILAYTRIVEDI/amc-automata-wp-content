@@ -7,12 +7,10 @@
 
 declare( strict_types = 1 );
 
-namespace AMC\Support\Tests;
+namespace AMC\Tests\Support;
 
 use AMC\Support\SmokeRule;
 use PHPUnit\Framework\TestCase;
-
-require_once dirname( __DIR__, 4 ) . '/inc/Support/SmokeRule.php';
 
 /**
  * Class SmokeRuleTest
