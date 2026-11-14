@@ -52,6 +52,9 @@ final class ReportPostTypeTest extends TestCase {
 	}
 
 	public function test_editor_fonts_load_only_in_the_report_block_editor(): void {
+		// Other tests (report view, console) may have enqueued the fonts already.
+		wp_dequeue_style( \AMC\Core\Brand::FONTS_HANDLE );
+
 		set_current_screen( 'edit-post' );
 		ReportPostType::enqueue_editor_fonts();
 		$this->assertFalse( wp_style_is( \AMC\Core\Brand::FONTS_HANDLE, 'enqueued' ), 'not on other screens' );
