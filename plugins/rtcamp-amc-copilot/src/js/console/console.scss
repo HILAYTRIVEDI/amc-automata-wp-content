@@ -140,6 +140,9 @@
 
 .amc-simple-table .widefat td {
 	vertical-align: middle;
+	// Long unbroken values (file paths, SQL) must wrap, not push the
+	// table past the postbox and scroll the whole page.
+	overflow-wrap: anywhere;
 }
 
 .amc-simple-table .tablenav .actions {
