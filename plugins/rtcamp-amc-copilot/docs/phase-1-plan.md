@@ -446,6 +446,6 @@ Each lane and each follow-up task is executed by an AI agent. Work is assigned b
 
 **Open items**
 
-- [ ] rtCamp logo as SVG for the report header.
+- [x] rtCamp logo as SVG for the report header (`assets/images/rtcamp-logo.svg`).
 - [ ] Confirm the three pilot sites.
 - [ ] CVE provider owner and delivery date.
