@@ -148,7 +148,14 @@ abstract class AbstractSectionBlock extends AbstractBlock {
 	protected function key_value_table( array $rows ): string {
 		$html = '';
 
+		$empty = esc_html__( '—', 'rtcamp-amc-copilot' );
+
 		foreach ( $rows as [ $label, $value ] ) {
+			// A bare dash reads as a gap, not as data: let the stylesheet mute it.
+			if ( $empty === $value ) {
+				$value = '<span class="amc-empty">' . $empty . '</span>';
+			}
+
 			$html .= sprintf( '<tr><th scope="row">%1$s</th><td>%2$s</td></tr>', esc_html( $label ), $value );
 		}
 

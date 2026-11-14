@@ -251,4 +251,18 @@ final class MailerTest extends NotifyTestCase {
 		$this->assertStringContainsString( 'page=amc-reports', $this->mime(), 'links to the client view' );
 		$this->assertStringContainsString( 'multipart/alternative', $this->sent()->header );
 	}
+
+	public function test_renderer_html_uses_the_rtcamp_brand(): void {
+		$html = EmailRenderer::html(
+			[
+				'heading'    => 'Heading',
+				'action_url' => 'https://example.com/go',
+			]
+		);
+
+		$this->assertStringContainsString( 'Reddit Sans', $html );
+		$this->assertStringContainsString( 'border-top:4px solid ' . \AMC\Core\Brand::RED, $html );
+		$this->assertStringContainsString( 'background:' . \AMC\Core\Brand::INK, $html, 'the action button is ink' );
+		$this->assertStringNotContainsString( '#2271b1', $html, 'no admin blue left' );
+	}
 }

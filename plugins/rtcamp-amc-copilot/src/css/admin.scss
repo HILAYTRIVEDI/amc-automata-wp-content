@@ -1,3 +1,143 @@
-/*
-Write your Sass code here for admin.
-*/
+/**
+ * rtCamp brand for the plugin's small wp-admin surfaces: the "AMC Copilot"
+ * dashboard widget and the client's "Maintenance Reports" list. Loaded only
+ * on those screens (DashboardWidget, ClientView). Status colours stay core's.
+ */
+
+@use 'brand';
+
+/* stylelint-disable selector-class-pattern, selector-id-pattern -- core class names and the widget ID. */
+
+// Dashboard widget.
+#amc_copilot_overview {
+
+	.inside {
+
+		@include brand.typeface;
+
+		color: brand.$ink;
+	}
+
+	.postbox-header .hndle {
+		font-family: brand.$font;
+		font-weight: 600;
+
+		&::before {
+			content: "";
+			display: inline-block;
+			width: 8px;
+			height: 8px;
+			margin-inline-end: 8px;
+			border-radius: 50%;
+			background: brand.$red;
+			vertical-align: middle;
+		}
+	}
+
+	.widefat {
+		border-color: brand.$rule;
+		box-shadow: none;
+
+		td,
+		th {
+			color: brand.$ink;
+		}
+	}
+
+	.striped > tbody > :nth-child(odd) {
+		background: brand.$cream;
+	}
+
+	.description {
+		color: brand.$muted;
+	}
+
+	.button-primary {
+		border-color: brand.$ink;
+		background: brand.$ink;
+		color: #fff;
+
+		&:hover,
+		&:focus {
+			border-color: #000;
+			background: #000;
+		}
+	}
+}
+
+// Client "Maintenance Reports" list.
+.amc-reports {
+
+	@include brand.tokens;
+	@include brand.typeface;
+
+	max-width: 960px;
+	color: brand.$ink;
+
+	// `h1` outranks core's `.wrap .wp-heading-inline`.
+	> h1.wp-heading-inline {
+		display: inline-flex;
+		align-items: center;
+		gap: 14px;
+		margin-bottom: 8px;
+		font-size: 24px;
+		font-weight: 600;
+		letter-spacing: -0.01em;
+		color: brand.$ink;
+
+		&::before {
+			content: "";
+			display: inline-block;
+			flex: none;
+			width: 84px;
+			height: 28px;
+			background: brand.$logo no-repeat left center / contain;
+		}
+	}
+
+	.wp-list-table {
+		border: 0;
+		border-top: 4px solid brand.$red;
+		background: brand.$paper;
+		box-shadow: 0 0 0 1px brand.$rule;
+
+		thead th {
+
+			@include brand.eyebrow;
+
+			padding: 14px 16px;
+			border-bottom: 1px solid brand.$ink;
+		}
+
+		td {
+			padding: 14px 16px;
+			border-bottom: 1px solid brand.$rule;
+			color: brand.$ink;
+			font-size: 14px;
+		}
+
+		tbody tr:last-child td {
+			border-bottom: 0;
+		}
+
+		td:first-child a {
+			color: brand.$ink;
+			font-weight: 600;
+			text-decoration: underline;
+			text-decoration-color: brand.$faint;
+			text-underline-offset: 3px;
+
+			&:hover,
+			&:focus {
+				color: brand.$red;
+				text-decoration-color: currentcolor;
+			}
+		}
+	}
+
+	&.wrap .striped > tbody > :nth-child(odd) {
+		background: transparent;
+	}
+}
+
+/* stylelint-enable selector-class-pattern, selector-id-pattern */

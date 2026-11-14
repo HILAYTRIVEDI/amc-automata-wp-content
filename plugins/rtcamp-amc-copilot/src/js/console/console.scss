@@ -4,6 +4,7 @@
  * side-effect free, so webpack would drop it.
  */
 @use '../../../node_modules/@wordpress/dataviews/build-style/style';
+@use '../../css/brand';
 
 /*
  * Layout only. Colours, type and boxes come from core admin classes
@@ -441,6 +442,205 @@
 
 	.dataviews-pagination {
 		padding-inline: 0;
+	}
+}
+/* stylelint-enable selector-class-pattern */
+
+/*
+ * rtCamp brand (rtcamp.com): Reddit Sans, near-black ink as the action colour,
+ * warm neutral rules, the rtCamp red only for the active-tab marker and the
+ * wordmark. Status colours (badges, notices) stay core's, so meaning does not
+ * change. Everything is scoped to the console and its modals.
+ */
+/* stylelint-disable selector-class-pattern -- core and @wordpress/components class names. */
+.amc-console,
+.toplevel_page_amc-copilot .components-modal__frame {
+
+	@include brand.tokens;
+	@include brand.typeface;
+
+	// @wordpress/components read these for primary buttons, toggles, focus.
+	--wp-admin-theme-color: #{brand.$ink};
+	--wp-admin-theme-color--rgb: 28, 28, 28;
+	--wp-admin-theme-color-darker-10: #000;
+	--wp-admin-theme-color-darker-10--rgb: 0, 0, 0;
+	--wp-admin-theme-color-darker-20: #000;
+	--wp-admin-theme-color-darker-20--rgb: 0, 0, 0;
+
+	color: brand.$ink;
+
+	a:not(.nav-tab, .button, .components-button) {
+		color: brand.$ink;
+		text-decoration: underline;
+		text-decoration-color: brand.$faint;
+		text-underline-offset: 2px;
+
+		&:hover,
+		&:focus {
+			color: brand.$red;
+			text-decoration-color: currentcolor;
+		}
+	}
+
+	// Core (non-component) buttons.
+	.button-primary {
+		border-color: brand.$ink;
+		background: brand.$ink;
+		color: #fff;
+
+		&:hover,
+		&:focus {
+			border-color: #000;
+			background: #000;
+			color: #fff;
+		}
+
+		&:focus {
+			box-shadow: 0 0 0 1px #fff, 0 0 0 3px brand.$ink;
+		}
+	}
+
+	.button:not(.button-primary) {
+		border-color: brand.$ink;
+		color: brand.$ink;
+
+		&:hover,
+		&:focus {
+			border-color: #000;
+			background: brand.$cream;
+			color: #000;
+		}
+	}
+
+	.components-modal__header-heading,
+	h1,
+	h2,
+	h3,
+	h4 {
+		color: brand.$ink;
+		letter-spacing: -0.01em;
+	}
+}
+
+.amc-console {
+
+	// Masthead: the rtCamp wordmark beside the product name. `h1` outranks
+	// core's `.wrap .wp-heading-inline`.
+	> h1.wp-heading-inline {
+		display: inline-flex;
+		align-items: center;
+		gap: 14px;
+		font-size: 24px;
+		font-weight: 600;
+
+		&::before {
+			content: "";
+			display: inline-block;
+			flex: none;
+			width: 84px;
+			height: 28px;
+			background: brand.$logo no-repeat left center / contain;
+		}
+	}
+
+	// Section tabs: flat, ink text, a red bar under the current one.
+	.nav-tab-wrapper {
+		border-bottom-color: brand.$rule;
+	}
+
+	.nav-tab {
+		margin-inline-start: 0;
+		margin-inline-end: 4px;
+		padding: 8px 14px;
+		border: 0;
+		border-bottom: 2px solid transparent;
+		background: transparent;
+		color: brand.$muted;
+		font-weight: 500;
+
+		&:hover,
+		&:focus {
+			background: transparent;
+			color: brand.$ink;
+		}
+
+		&.nav-tab-active {
+			border-bottom-color: brand.$red;
+			background: transparent;
+			color: brand.$ink;
+			font-weight: 600;
+		}
+	}
+
+	.subsubsub {
+		color: brand.$faint;
+
+		a {
+			color: brand.$muted;
+			text-decoration: none;
+
+			&.current {
+				color: brand.$ink;
+				font-weight: 600;
+			}
+		}
+	}
+
+	// Boxes and tables: warm hairlines instead of admin grey.
+	.postbox {
+		border-color: brand.$rule;
+		box-shadow: none;
+	}
+
+	.postbox-header {
+		border-bottom-color: brand.$rule;
+
+		.hndle {
+			font-weight: 600;
+		}
+	}
+
+	.widefat {
+		border-color: brand.$rule;
+		box-shadow: none;
+
+		thead th,
+		thead td,
+		tfoot th,
+		tfoot td {
+			border-color: brand.$rule;
+			color: brand.$muted;
+			font-weight: 600;
+		}
+
+		td,
+		th {
+			color: brand.$ink;
+		}
+	}
+
+	.striped > tbody > :nth-child(odd),
+	.widefat.striped > tbody > :nth-child(odd) {
+		background: brand.$cream;
+	}
+
+	.amc-kv th,
+	.form-table th {
+		color: brand.$muted;
+	}
+
+	.description {
+		color: brand.$muted;
+	}
+
+	.amc-sparkline {
+		color: brand.$ink;
+	}
+
+	// Setup wizard steps pick up the ink via the theme colour; the current
+	// step also gets the brand red ring.
+	.amc-setup-step.is-current .amc-setup-step-number {
+		box-shadow: 0 0 0 2px #fff, 0 0 0 4px brand.$red;
 	}
 }
 /* stylelint-enable selector-class-pattern */

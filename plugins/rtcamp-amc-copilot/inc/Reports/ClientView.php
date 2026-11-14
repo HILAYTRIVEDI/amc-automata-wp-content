@@ -10,6 +10,7 @@ declare( strict_types = 1 );
 namespace AMC\Reports;
 
 use AMC\Core\Assets;
+use AMC\Core\Brand;
 use AMC\Core\Capabilities;
 use AMC\Main;
 use WP_Post;
@@ -90,6 +91,8 @@ final class ClientView implements Registrable {
 		 */
 		$assets = Main::get_instance()->get_shared( Assets::class );
 
+		Brand::enqueue_fonts();
+
 		if ( $assets->has_asset( 'css/report-view', 'css' ) ) {
 			$assets->register_style( 'amc-report-view', 'css/report-view' );
 			wp_enqueue_style( 'amc-report-view' );
@@ -113,6 +116,25 @@ final class ClientView implements Registrable {
 			'admin_body_class',
 			static fn ( string $classes ): string => $classes . ' amc-report-page'
 		);
+	}
+
+	/**
+	 * Brand styles for the published-reports list.
+	 */
+	private function enqueue_list_styles(): void {
+		Brand::enqueue_fonts();
+
+		/**
+		 * Shared Assets service.
+		 *
+		 * @var Assets $assets
+		 */
+		$assets = Main::get_instance()->get_shared( Assets::class );
+
+		if ( $assets->has_asset( 'css/admin', 'css' ) ) {
+			$assets->register_style( 'amc-admin-brand', 'css/admin' );
+			wp_enqueue_style( 'amc-admin-brand' );
+		}
 	}
 
 	/**
@@ -162,7 +184,7 @@ final class ClientView implements Registrable {
 	}
 
 	/**
-	 * Let lane D2 enqueue report styles on the single-report view only.
+	 * Brand styles on the list; lane D2's report styles on one report.
 	 *
 	 * @param string $hook_suffix Current admin screen.
 	 */
@@ -173,15 +195,19 @@ final class ClientView implements Registrable {
 
 		$post = $this->requested_report();
 
-		if ( $post instanceof WP_Post ) {
-			/**
-			 * Enqueue the report view assets (print stylesheet, block styles).
-			 *
-			 * @param int     $post_id Report ID.
-			 * @param WP_Post $post    Report.
-			 */
-			do_action( 'amc_report_view_enqueue', $post->ID, $post );
+		if ( ! $post instanceof WP_Post ) {
+			$this->enqueue_list_styles();
+
+			return;
 		}
+
+		/**
+		 * Enqueue the report view assets (print stylesheet, block styles).
+		 *
+		 * @param int     $post_id Report ID.
+		 * @param WP_Post $post    Report.
+		 */
+		do_action( 'amc_report_view_enqueue', $post->ID, $post );
 	}
 
 	/**
@@ -366,7 +392,7 @@ final class ClientView implements Registrable {
 
 		echo '<footer class="amc-report-footer">';
 		/* translators: %s: site name. */
-		echo '<p>' . esc_html( sprintf( __( 'Prepared by rtCamp for %s. Confidential.', 'rtcamp-amc-copilot' ), $site_name ) . ( '' !== $report_id ? ' ' . $report_id : '' ) ) . '</p>';
+		echo '<p>' . esc_html( sprintf( __( 'Prepared by rtCamp for %s. Confidential.', 'rtcamp-amc-copilot' ), $site_name ) . ( '' !== $report_id ? ' ' . $report_id : '' ) ) . '</p><p>rtcamp.com</p>';
 		echo '</footer></article></div>';
 	}
 

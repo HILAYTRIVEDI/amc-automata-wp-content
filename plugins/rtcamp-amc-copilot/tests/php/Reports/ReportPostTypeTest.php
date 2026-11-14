@@ -50,4 +50,20 @@ final class ReportPostTypeTest extends TestCase {
 		$this->assertTrue( user_can( $engineer, 'publish_amc_reports' ) );
 		$this->assertFalse( user_can( $admin, 'edit_amc_reports' ), 'Client administrators cannot edit reports' );
 	}
+
+	public function test_editor_fonts_load_only_in_the_report_block_editor(): void {
+		set_current_screen( 'edit-post' );
+		ReportPostType::enqueue_editor_fonts();
+		$this->assertFalse( wp_style_is( \AMC\Core\Brand::FONTS_HANDLE, 'enqueued' ), 'not on other screens' );
+
+		$screen = \WP_Screen::get( ReportPostType::SLUG );
+		$screen->is_block_editor( true );
+		$GLOBALS['current_screen'] = $screen; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Test fixture.
+
+		ReportPostType::enqueue_editor_fonts();
+		$this->assertTrue( wp_style_is( \AMC\Core\Brand::FONTS_HANDLE, 'enqueued' ) );
+
+		wp_dequeue_style( \AMC\Core\Brand::FONTS_HANDLE );
+		set_current_screen( 'front' );
+	}
 }

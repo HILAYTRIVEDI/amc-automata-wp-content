@@ -9,7 +9,10 @@ declare( strict_types = 1 );
 
 namespace AMC\Admin;
 
+use AMC\Core\Assets;
+use AMC\Core\Brand;
 use AMC\Core\Capabilities;
+use AMC\Main;
 use WP_REST_Request;
 use rtCamp\WPPrimitives\Contracts\Interfaces\Registrable;
 
@@ -63,6 +66,28 @@ final class DashboardWidget implements Registrable {
 			__( 'AMC Copilot', 'rtcamp-amc-copilot' ),
 			[ $this, 'render' ]
 		);
+
+		self::enqueue_styles();
+	}
+
+	/**
+	 * Brand type and colours for the widget (wp_dashboard_setup runs before
+	 * the admin header prints styles).
+	 */
+	private static function enqueue_styles(): void {
+		Brand::enqueue_fonts();
+
+		/**
+		 * Shared Assets service.
+		 *
+		 * @var Assets $assets
+		 */
+		$assets = Main::get_instance()->get_shared( Assets::class );
+
+		if ( $assets->has_asset( 'css/admin', 'css' ) ) {
+			$assets->register_style( 'amc-admin-brand', 'css/admin' );
+			wp_enqueue_style( 'amc-admin-brand' );
+		}
 	}
 
 	/**

@@ -9,6 +9,7 @@ declare( strict_types = 1 );
 
 namespace AMC\Reports;
 
+use AMC\Core\Brand;
 use AMC\Core\Capabilities;
 use rtCamp\WPPrimitives\Contracts\Abstracts\AbstractPostType;
 
@@ -122,6 +123,25 @@ final class ReportPostType extends AbstractPostType {
 
 		add_filter( 'user_has_cap', [ $this, 'map_caps' ], 10, 1 );
 		add_filter( 'rest_post_dispatch', [ self::class, 'noindex_headers' ], 10, 3 );
+		add_action( 'enqueue_block_assets', [ self::class, 'enqueue_editor_fonts' ] );
+	}
+
+	/**
+	 * Brand typefaces inside the report editor's canvas (the section blocks'
+	 * editor styles use them; `enqueue_block_assets` reaches the iframe).
+	 */
+	public static function enqueue_editor_fonts(): void {
+		if ( ! is_admin() || ! function_exists( 'get_current_screen' ) ) {
+			return;
+		}
+
+		$screen = get_current_screen();
+
+		if ( null === $screen || self::SLUG !== $screen->post_type || ! $screen->is_block_editor() ) {
+			return;
+		}
+
+		Brand::enqueue_fonts();
 	}
 
 	/**
