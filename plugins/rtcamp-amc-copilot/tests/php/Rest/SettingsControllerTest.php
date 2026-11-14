@@ -107,4 +107,28 @@ final class SettingsControllerTest extends TestCase {
 		$this->assertSame( 200, $this->post( [ 'report_publish_recipients' => [] ] )->get_status() );
 		$this->assertSame( [], Settings::get_value( 'report_publish_recipients' ) );
 	}
+
+	public function test_delete_reports_on_uninstall_is_off_by_default_and_round_trips(): void {
+		delete_option( 'amc_delete_reports_on_uninstall' );
+
+		$get = rest_get_server()->dispatch( new WP_REST_Request( 'GET', '/amc/v1/settings' ) );
+		$this->assertFalse( $get->get_data()['delete_reports_on_uninstall'], 'reports are kept by default' );
+
+		$response = $this->post( [ 'delete_reports_on_uninstall' => true ] );
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertTrue( $response->get_data()['delete_reports_on_uninstall'] );
+		$this->assertTrue( (bool) get_option( 'amc_delete_reports_on_uninstall' ), 'uninstall.php reads this option' );
+
+		$response = $this->post( [ 'delete_reports_on_uninstall' => false ] );
+		$this->assertFalse( $response->get_data()['delete_reports_on_uninstall'] );
+		$this->assertFalse( get_option( 'amc_delete_reports_on_uninstall' ) );
+	}
+
+	public function test_saving_other_settings_leaves_delete_reports_untouched(): void {
+		update_option( 'amc_delete_reports_on_uninstall', 1, false );
+
+		$this->post( [ 'digest_time' => '08:00' ] );
+
+		$this->assertTrue( (bool) get_option( 'amc_delete_reports_on_uninstall' ) );
+	}
 }

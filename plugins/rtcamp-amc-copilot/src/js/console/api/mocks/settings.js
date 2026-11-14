@@ -10,6 +10,7 @@ export const settings = {
 	digest_time: '09:00',
 	immediate_alerts_per_hour: 10,
 	notify_client_on_publish: true,
+	delete_reports_on_uninstall: false,
 	smoke_urls: [
 		{
 			url: 'https://example-client.com/checkout/',

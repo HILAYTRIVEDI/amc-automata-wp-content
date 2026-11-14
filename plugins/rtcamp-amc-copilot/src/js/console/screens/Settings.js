@@ -791,6 +791,8 @@ export default function Settings() {
 				),
 				notify_client_on_publish: form.notify_client_on_publish,
 				report_publish_recipients: reportRecipients,
+				delete_reports_on_uninstall:
+					!! form.delete_reports_on_uninstall,
 				loopback_auth: {
 					username: form.loopback_auth.username,
 					...( password ? { password } : {} ),
@@ -1040,6 +1042,26 @@ export default function Settings() {
 							} }
 						/>
 					</Row>
+				</tbody>
+			</table>
+
+			<h3>{ __( 'Uninstall', 'rtcamp-amc-copilot' ) }</h3>
+			<table className="form-table" role="presentation">
+				<tbody>
+					<CheckboxRow
+						id="amc-setting-delete-reports"
+						title={ __( 'Reports', 'rtcamp-amc-copilot' ) }
+						label={ __(
+							'Delete reports when the plugin is uninstalled',
+							'rtcamp-amc-copilot'
+						) }
+						help={ __(
+							'Uninstalling always removes the plugin’s tables, settings and capabilities. Reports are kept unless this is ticked; deleting them cannot be undone.',
+							'rtcamp-amc-copilot'
+						) }
+						checked={ !! form.delete_reports_on_uninstall }
+						onChange={ set( 'delete_reports_on_uninstall' ) }
+					/>
 				</tbody>
 			</table>
 
