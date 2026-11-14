@@ -381,6 +381,7 @@ One option, autoload **off**, accessed through `AMC\Core\Settings`. Methods: `Se
 | `digest_time` | `HH:MM` | `09:00` | Site time |
 | `immediate_alerts_per_hour` | int 0–100 | `10` | Overflow goes to the digest |
 | `notify_client_on_publish` | bool | `true` | |
+| `report_publish_recipients` | string[] | `[]` | Emailed when a report is FIRST published, whether or not `notify_client_on_publish` is on (client administrators are added when it is). Sanitised, deduplicated case-insensitively, at most 25 (`Settings::MAX_REPORT_PUBLISH_RECIPIENTS`). `POST /settings` returns 400 `amc_invalid_email` (with `data.invalid`) or `amc_too_many_recipients` instead of dropping entries |
 | `smoke_urls` | `[{ url, required_text }]` | `[]` | Extra URLs; home, login and latest post or product are always added by `smoke.urls` |
 | `loopback_auth` | `{ username, password }` | empty | Password stored encrypted. Needs `AMC_COPILOT_ENCRYPTION_KEY` in wp-config; without it a password is not saved. REST returns `{ username, has_password, encryption_available }` |
 | `kill_switch` | bool | `false` | The `AMC_COPILOT_DISABLED` constant overrides it. REST adds `kill_switch_locked` |
@@ -483,14 +484,14 @@ Rules:
 | `amc_run_completed` | action | `Runner` after any run (including `error`) | `array $run_row` | C (optional), A2 |
 | `amc_alert_rules` | filter | `AlertRules::table()` | `array<check_id, 'immediate'\|'digest'\|'none'\|callable( array $finding ): string> $rules` | Sites, other lanes |
 | `amc_notify_finding_url` | filter | `Mailer::finding_url()` | `string $url, array $finding` | C (console deep link) |
-| `amc_report_email` | filter | `Mailer::send_report_*()` | `array $content, 'draft_ready'\|'published' $event, WP_Post $report` | D1 (email content) |
-| `amc_report_published_recipients` | filter | `Mailer::send_report_published()` | `list<string> $emails, WP_Post $report` | D1 |
+| `amc_report_email` | filter | `Mailer::send_report_draft_ready()` | `array $content, 'draft_ready' $event, WP_Post $report` | D1 (email content). The published email comes from `ReportEmails::published()` |
+| `amc_report_published_recipients` | filter | `Mailer::send_report_published()` | `list<string> $emails` (from `ReportEmails::published_recipients()`), `WP_Post $report` | D1 |
 | `amc_scheduler_time_budget` | filter | `Scheduler::tick()` | `int $seconds` (25) | Hosts with long cron windows |
 | `amc_activate` | action | Plugin activation | – | Lanes scheduling their own cron events |
 | `amc_deactivate` | action | Deactivation and uninstall | – | Lanes clearing their cron events |
 | `amc_scheduler_tick` | cron | Every 5 min | – | Scheduler |
 | `amc_report_draft_ready` | action | `Generator::build()`, after the FIRST snapshot of a report | `int $post_id` | A2 Mailer (`Mailer::send_report_draft_ready`); content from `ReportEmails::draft_ready()` |
-| `amc_report_published` | action | `ReportPublishing`, on the transition to `publish` | `int $post_id` | A2 Mailer (`Mailer::send_report_published`); content from `ReportEmails::published()` |
+| `amc_report_published` | action | `ReportPublishing`, on the transition to `publish` | `int $post_id` | `ReportEmails::on_published()` → `Mailer::send_report_published()`; content from `ReportEmails::published()`. Sent once per report, guarded by the post meta `_amc_published_email_sent` |
 | `amc_report_draft_ready_email`, `amc_report_published_email` | filter | `ReportEmails` | `array{subject,text,html,recipients} $email`, `int $post_id` | Anyone changing the email content |
 | `amc_report_snapshot` | filter | `SnapshotBuilder::build()` | `array $snapshot`, `Period $period` | Add or adjust detected values |
 | `amc_report_site_code` | filter | `Generator::site_code()` | `string $code` | The code in report IDs (`AMC-<code>-2026-10`) |

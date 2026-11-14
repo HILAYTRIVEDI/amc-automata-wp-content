@@ -10,6 +10,7 @@ declare( strict_types = 1 );
 namespace AMC\Tests\Notify;
 
 use AMC\Checks\Severity;
+use AMC\Core\Capabilities;
 use AMC\Core\Settings;
 use AMC\Notify\EmailRenderer;
 use AMC\Notify\Mailer;
@@ -168,6 +169,8 @@ final class MailerTest extends NotifyTestCase {
 	}
 
 	public function test_report_published_goes_to_client_admins_only_one_mail_each(): void {
+		// The activation hook (which gives administrators amc_view_reports) does not run in tests.
+		get_role( 'administrator' )->add_cap( Capabilities::VIEW_REPORTS );
 		$id = $this->report( 'publish' );
 		$this->make_admin( 'client1@example.com' );
 		$this->make_admin( 'client2@example.com' );
@@ -229,5 +232,23 @@ final class MailerTest extends NotifyTestCase {
 		$this->assertFalse( Mailer::send_report_draft_ready( $post ) );
 		$this->assertFalse( Mailer::send_report_published( 999999 ) );
 		$this->assertSame( 0, $this->sent_count() );
+	}
+
+	public function test_report_published_uses_the_report_emails_content_and_list(): void {
+		$id = $this->report( 'publish' );
+		Settings::update(
+			[
+				'report_publish_recipients' => [ 'pm@example.com' ],
+				'notify_client_on_publish'  => false,
+			]
+		);
+		reset_phpmailer_instance();
+
+		$this->assertTrue( Mailer::send_report_published( $id ) );
+
+		$this->assertSame( 1, $this->sent_count() );
+		$this->assertSame( 'pm@example.com', $this->sent()->to[0][0] );
+		$this->assertStringContainsString( 'page=amc-reports', $this->mime(), 'links to the client view' );
+		$this->assertStringContainsString( 'multipart/alternative', $this->sent()->header );
 	}
 }
