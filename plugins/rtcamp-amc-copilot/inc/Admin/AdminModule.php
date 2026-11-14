@@ -28,6 +28,8 @@ final class AdminModule extends AbstractModule {
 			ConsolePage::class,
 			ConsoleAssets::class,
 			DashboardWidget::class,
+			SetupRedirect::class,
+			SetupNotice::class,
 		];
 	}
 }

@@ -54,3 +54,40 @@ export const candidateUsers = [
 	{ id: 12, name: 'Support Contractor', slug: 'support-contractor' },
 	{ id: 14, name: 'Sam Okafor', slug: 'sam.okafor' },
 ];
+
+/**
+ * Setup wizard state (`GET /setup`, `SetupState::for_rest()` plus
+ * `SetupDefaults::get()`).
+ */
+export const setup = {
+	completed: false,
+	completed_at: null,
+	notice_dismissed: false,
+	detected: {
+		environment: 'production',
+		site_name: 'Example Client',
+		home_url: 'https://example-client.com/',
+		primary_domain: 'example-client.com',
+		admin_email: 'admin@example-client.com',
+		engineer_emails: [
+			'priya@example-client.com',
+			'jordan@rtcamp.example',
+		],
+		host: {
+			slug: 'wpengine',
+			label: 'WP Engine (managed WordPress)',
+			web_server: 'nginx',
+			php_version: '8.3.12',
+		},
+		ssl: { issuer: "Let's Encrypt", valid_to: '2027-01-12T10:00:00Z' },
+		suggestions: {
+			overview: {
+				client_name: 'Example Client',
+				maintenance_schedule: 'Monthly',
+			},
+			cms: { websites_covered: 'example-client.com' },
+			hosting: { hosting_type: 'WP Engine (managed WordPress)' },
+			ssl: { ssl_type: "Free (Let's Encrypt)" },
+		},
+	},
+};

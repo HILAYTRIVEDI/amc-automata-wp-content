@@ -101,6 +101,7 @@ const getState = () => {
 			savedFields: clone( fixtures.savedFields ),
 			settings: clone( fixtures.settings ),
 			engineers: clone( fixtures.engineers ),
+			setup: clone( fixtures.setup ),
 			pending: {},
 		};
 	}
@@ -1137,7 +1138,20 @@ export const saveSavedFields = async ( fields ) =>
 			method: 'POST',
 			data: { fields },
 			mock: ( s ) => {
-				s.savedFields.fields = fields;
+				// Merge like the route: only the fields sent change.
+				Object.entries( fields ).forEach( ( [ section, values ] ) => {
+					s.savedFields.fields[ section ] = {
+						...s.savedFields.fields[ section ],
+						...Object.fromEntries(
+							Object.entries( values ).map(
+								( [ key, value ] ) => [
+									key,
+									'' === value ? null : value,
+								]
+							)
+						),
+					};
+				} );
 				return ok( s.savedFields );
 			},
 		} )
@@ -1274,5 +1288,43 @@ export const getCandidateUsers = async () =>
 						( u ) => ! s.engineers.some( ( e ) => e.id === u.id )
 					)
 				),
+		} )
+	).body;
+
+/**
+ * @typedef {Object} AmcSetup
+ * @property {boolean}     completed        Whether the wizard has been finished.
+ * @property {string|null} completed_at     When, ISO 8601 UTC.
+ * @property {boolean}     notice_dismissed Whether the current user closed the setup notice.
+ * @property {Object}      [detected]       What the plugin already knows (GET only):
+ *                                          environment, site_name, home_url, primary_domain,
+ *                                          admin_email, engineer_emails, host, ssl, and
+ *                                          `suggestions` in the saved-fields shape.
+ */
+
+/**
+ * GET /setup (needs `amc_manage` and `manage_options`)
+ *
+ * @return {Promise<AmcSetup>} Setup state with detected values.
+ */
+export const getSetup = async () =>
+	( await request( { path: '/setup', mock: ( s ) => ok( s.setup ) } ) ).body;
+
+/**
+ * POST /setup/complete
+ *
+ * @return {Promise<AmcSetup>} Setup state.
+ */
+export const completeSetup = async () =>
+	(
+		await request( {
+			path: '/setup/complete',
+			method: 'POST',
+			mock: ( s ) => {
+				s.setup.completed = true;
+				s.setup.completed_at = iso( NOW );
+				const { detected, ...setupState } = s.setup;
+				return ok( setupState );
+			},
 		} )
 	).body;

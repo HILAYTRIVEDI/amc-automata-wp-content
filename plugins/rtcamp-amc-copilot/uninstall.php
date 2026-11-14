@@ -41,6 +41,9 @@ if ( get_option( 'amc_delete_reports_on_uninstall' ) ) {
 \AMC\Core\Capabilities::remove_all();
 \AMC\Core\Installer::uninstall();
 
-foreach ( [ 'amc_settings', 'amc_saved_fields', 'amc_version', 'amc_delete_reports_on_uninstall' ] as $amc_option ) {
+foreach ( [ 'amc_settings', 'amc_saved_fields', 'amc_version', 'amc_delete_reports_on_uninstall', 'amc_setup_completed' ] as $amc_option ) {
 	delete_option( $amc_option );
 }
+
+delete_transient( 'amc_activation_redirect' );
+delete_metadata( 'user', 0, 'amc_setup_notice_dismissed', '', true );

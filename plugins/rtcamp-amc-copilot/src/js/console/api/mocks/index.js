@@ -7,5 +7,5 @@ export { performance } from './performance';
 export { changes } from './changes';
 export { runs } from './runs';
 export { reports, savedFields } from './reports';
-export { settings, engineers, candidateUsers } from './settings';
+export { settings, engineers, candidateUsers, setup } from './settings';
 export { buildOverview } from './overview';

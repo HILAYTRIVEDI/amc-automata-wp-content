@@ -12,7 +12,12 @@ import { __, sprintf } from '@wordpress/i18n';
 import { isMockMode } from './api';
 import FindingModal from './components/FindingModal';
 import FindingRedirect from './components/FindingRedirect';
-import { getScreen, getSections, sectionFor } from './constants';
+import {
+	getScreen,
+	getSections,
+	sectionFor,
+	STANDALONE_SCREENS,
+} from './constants';
 import Changes from './screens/Changes';
 import Errors from './screens/Errors';
 import Inventory from './screens/Inventory';
@@ -22,6 +27,7 @@ import Reports from './screens/Reports';
 import Runs from './screens/Runs';
 import Security from './screens/Security';
 import Settings from './screens/Settings';
+import Setup from './screens/Setup';
 import Smoke from './screens/Smoke';
 import Updates from './screens/Updates';
 import Vulnerabilities from './screens/Vulnerabilities';
@@ -45,6 +51,7 @@ const COMPONENTS = {
 	runs: Runs,
 	reports: Reports,
 	settings: Settings,
+	setup: Setup,
 };
 
 /**
@@ -96,6 +103,8 @@ export default function App() {
 	const current = COMPONENTS[ screen ] ? screen : 'overview';
 	const Screen = COMPONENTS[ current ];
 	const section = sectionFor( current );
+	// The setup wizard is a focused flow: no section tabs.
+	const showNav = ! STANDALONE_SCREENS.includes( current );
 	const firstScreen = useRef( true );
 	useFocusHeadingOnClose( ! isFindingLink && !! finding );
 
@@ -133,32 +142,37 @@ export default function App() {
 					) }
 				</Notice>
 			) }
-			<nav
-				className="nav-tab-wrapper amc-nav"
-				aria-label={ __( 'AMC Copilot screens', 'rtcamp-amc-copilot' ) }
-			>
-				{ getSections().map( ( item ) => {
-					const active =
-						! isFindingLink && item.slug === section.slug;
-					let ariaCurrent;
-					if ( active ) {
-						// The tab is the page itself only when the section has one screen.
-						ariaCurrent =
-							1 === item.screens.length ? 'page' : 'true';
-					}
-					return (
-						<ScreenLink
-							key={ item.slug }
-							screen={ item.screens[ 0 ] }
-							className={ `nav-tab${ active ? ' nav-tab-active' : '' }` }
-							current={ ariaCurrent }
-						>
-							{ item.label }
-						</ScreenLink>
-					);
-				} ) }
-			</nav>
-			{ ! isFindingLink && section.screens.length > 1 && (
+			{ showNav && (
+				<nav
+					className="nav-tab-wrapper amc-nav"
+					aria-label={ __(
+						'AMC Copilot screens',
+						'rtcamp-amc-copilot'
+					) }
+				>
+					{ getSections().map( ( item ) => {
+						const active =
+							! isFindingLink && item.slug === section.slug;
+						let ariaCurrent;
+						if ( active ) {
+							// The tab is the page itself only when the section has one screen.
+							ariaCurrent =
+								1 === item.screens.length ? 'page' : 'true';
+						}
+						return (
+							<ScreenLink
+								key={ item.slug }
+								screen={ item.screens[ 0 ] }
+								className={ `nav-tab${ active ? ' nav-tab-active' : '' }` }
+								current={ ariaCurrent }
+							>
+								{ item.label }
+							</ScreenLink>
+						);
+					} ) }
+				</nav>
+			) }
+			{ showNav && ! isFindingLink && section.screens.length > 1 && (
 				<nav
 					className="amc-subnav"
 					aria-label={ sprintf(
