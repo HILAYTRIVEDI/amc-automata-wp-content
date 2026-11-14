@@ -76,7 +76,7 @@ final class RunDetailTest extends TestCase {
 	 * @param array<string, mixed> $data     Data.
 	 * @param int                  $user_id  User who triggered it.
 	 */
-	private function run( string $check_id, string $status, array $data, int $user_id = 0 ): int {
+	private function make_run( string $check_id, string $status, array $data, int $user_id = 0 ): int {
 		$runs = new RunsRepository();
 		$id   = $runs->create_running( $check_id, $user_id > 0 ? 'manual' : 'cron', $user_id );
 		$runs->finish( $id, $status, "{$status} summary", $data, 42 );
@@ -85,7 +85,7 @@ final class RunDetailTest extends TestCase {
 	}
 
 	public function test_without_detail_the_poll_shape_is_unchanged(): void {
-		$id  = $this->run( 'updates.core', 'pass', [ 'a' => 1 ] );
+		$id  = $this->make_run( 'updates.core', 'pass', [ 'a' => 1 ] );
 		$run = $this->get_run( $id, false );
 
 		$this->assertSame( [ 'a' => 1 ], $run['data'] );
@@ -95,10 +95,10 @@ final class RunDetailTest extends TestCase {
 	}
 
 	public function test_detail_links_the_run_to_its_neighbours_and_previous_result(): void {
-		$first  = $this->run( 'updates.core', 'pass', [ 'count' => 1 ] );
-		$other  = $this->run( 'updates.plugins', 'pass', [] );
-		$middle = $this->run( 'updates.core', 'warn', [ 'count' => 2 ], $this->engineer );
-		$last   = $this->run( 'updates.core', 'pass', [ 'count' => 3 ] );
+		$first  = $this->make_run( 'updates.core', 'pass', [ 'count' => 1 ] );
+		$other  = $this->make_run( 'updates.plugins', 'pass', [] );
+		$middle = $this->make_run( 'updates.core', 'warn', [ 'count' => 2 ], $this->engineer );
+		$last   = $this->make_run( 'updates.core', 'pass', [ 'count' => 3 ] );
 
 		$run = $this->get_run( $middle );
 
@@ -122,7 +122,7 @@ final class RunDetailTest extends TestCase {
 	}
 
 	public function test_the_first_run_of_a_check_has_no_older_or_previous(): void {
-		$id  = $this->run( 'updates.core', 'pass', [] );
+		$id  = $this->make_run( 'updates.core', 'pass', [] );
 		$run = $this->get_run( $id );
 
 		$this->assertNull( $run['older_id'] );
@@ -132,8 +132,8 @@ final class RunDetailTest extends TestCase {
 	}
 
 	public function test_error_runs_are_skipped_as_the_previous_result(): void {
-		$good  = $this->run( 'updates.core', 'pass', [ 'ok' => true ] );
-		$error = $this->run(
+		$good  = $this->make_run( 'updates.core', 'pass', [ 'ok' => true ] );
+		$error = $this->make_run(
 			'updates.core',
 			RunsRepository::STATUS_ERROR,
 			[
@@ -141,7 +141,7 @@ final class RunDetailTest extends TestCase {
 				'message'   => 'boom',
 			]
 		);
-		$id    = $this->run( 'updates.core', 'pass', [ 'ok' => true ] );
+		$id    = $this->make_run( 'updates.core', 'pass', [ 'ok' => true ] );
 
 		$run = $this->get_run( $id );
 
