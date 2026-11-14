@@ -16,7 +16,7 @@ registerBlockType( metadata.name, {
 	save: ( { attributes } ) => (
 		<section className="amc-section amc-section--custom">
 			<h2 className="wp-block-heading">{ attributes.title }</h2>
-			<InnerBlocks />
+			<InnerBlocks.Content />
 		</section>
 	),
 } );

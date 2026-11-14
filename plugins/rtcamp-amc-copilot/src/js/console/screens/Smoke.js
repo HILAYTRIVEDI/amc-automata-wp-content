@@ -2,8 +2,8 @@
  * WordPress dependencies
  */
 import { Button, Modal, Notice, TextControl } from '@wordpress/components';
-import { useMemo, useState } from '@wordpress/element';
-import { __ } from '@wordpress/i18n';
+import { useEffect, useMemo, useRef, useState } from '@wordpress/element';
+import { __, sprintf } from '@wordpress/i18n';
 import { pencil, plus } from '@wordpress/icons';
 
 /**
@@ -44,7 +44,7 @@ const statusLabel = ( item ) =>
  * @param {(...args: unknown[]) => unknown} props.onSaved    Called after saving.
  * @return {Element} Form.
  */
-function UrlForm( { item, closeModal, onSaved } ) {
+export function UrlForm( { item, closeModal, onSaved } ) {
 	const [ url, setUrl ] = useState( item?.url ?? '' );
 	const [ requiredText, setRequiredText ] = useState(
 		item?.required_text ?? ''
@@ -52,6 +52,16 @@ function UrlForm( { item, closeModal, onSaved } ) {
 	const [ busy, setBusy ] = useState( false );
 	const [ problem, setProblem ] = useState( '' );
 	const editing = !! item;
+	const urlInput = useRef( null );
+	const problemId = 'amc-smoke-url-problem';
+
+	// The save error is about the URL (or the required text), so move to the
+	// first field and let it point at the message; the Notice is also spoken.
+	useEffect( () => {
+		if ( problem && ! editing ) {
+			urlInput.current?.focus();
+		}
+	}, [ problem, editing ] );
 
 	const submit = async ( event ) => {
 		event.preventDefault();
@@ -80,9 +90,19 @@ function UrlForm( { item, closeModal, onSaved } ) {
 				label={ __( 'URL', 'rtcamp-amc-copilot' ) }
 				type="url"
 				value={ url }
-				onChange={ setUrl }
+				onChange={ ( value ) => {
+					setUrl( value );
+					setProblem( '' );
+				} }
 				disabled={ editing }
 				required
+				ref={ urlInput }
+				aria-invalid={ ! editing && !! problem }
+				// Only override aria-describedby when there is an error, so
+				// TextControl keeps linking its help text otherwise.
+				{ ...( ! editing && problem
+					? { 'aria-describedby': problemId }
+					: {} ) }
 				help={
 					editing
 						? __(
@@ -104,9 +124,11 @@ function UrlForm( { item, closeModal, onSaved } ) {
 				) }
 			/>
 			{ problem && (
-				<Notice status="error" isDismissible={ false }>
-					{ problem }
-				</Notice>
+				<div id={ problemId }>
+					<Notice status="error" isDismissible={ false }>
+						{ problem }
+					</Notice>
+				</div>
 			) }
 			<div className="amc-modal-actions">
 				<Button variant="tertiary" onClick={ closeModal }>
@@ -119,7 +141,9 @@ function UrlForm( { item, closeModal, onSaved } ) {
 					disabled={ ! url.trim() || busy }
 					accessibleWhenDisabled
 				>
-					{ __( 'Save', 'rtcamp-amc-copilot' ) }
+					{ busy
+						? __( 'Saving…', 'rtcamp-amc-copilot' )
+						: __( 'Save', 'rtcamp-amc-copilot' ) }
 				</Button>
 			</div>
 		</form>
@@ -231,6 +255,12 @@ export default function Smoke() {
 				( item ) => (
 					<Sparkline
 						values={ item.trend.map( ( point ) => point.ms ) }
+						unit=" ms"
+						label={ sprintf(
+							/* translators: %s: URL. */
+							__( 'Response time for %s', 'rtcamp-amc-copilot' ),
+							item.url
+						) }
 					/>
 				),
 				{ enableSorting: false }
@@ -314,6 +344,7 @@ export default function Smoke() {
 						actions={ actions }
 						getItemId={ ( item ) => item.url }
 						exportName="amc-smoke-checks"
+						label={ __( 'Smoke check URLs', 'rtcamp-amc-copilot' ) }
 					/>
 				</>
 			) }

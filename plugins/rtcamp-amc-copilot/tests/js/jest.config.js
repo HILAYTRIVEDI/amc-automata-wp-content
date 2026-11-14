@@ -11,8 +11,24 @@ module.exports = {
 		'**/?(*.)test.[jt]s?(x)',
 	],
 	moduleNameMapper: {
+		// npm installs several copies of @wordpress/private-apis (one per
+		// dependent). Each keeps its own lock registry, so `unlock()` in
+		// @wordpress/rich-text throws for objects locked by @wordpress/compose
+		// when the real @wordpress/components is loaded. One copy fixes it.
+		'^@wordpress/private-apis$':
+			'<rootDir>/node_modules/@wordpress/compose/node_modules/@wordpress/private-apis',
+		'^uuid$': '<rootDir>/tests/js/mocks/uuid-mock.js',
 		'\\.(scss|css)$': '<rootDir>/tests/js/mocks/style-mock.js',
 	},
+	// Several @wordpress/* packages ship ESM-only `.mjs` builds that the real
+	// @wordpress/components pulls in; compile them with the project's Babel
+	// config. Everything else in node_modules stays untransformed.
+	transform: {
+		'\\.[cm]?[jt]sx?$': 'babel-jest',
+	},
+	transformIgnorePatterns: [
+		'/node_modules/(?!(@wordpress/(ui|theme|components|dataviews)|@base-ui)/)',
+	],
 	setupFiles: [ '<rootDir>/tests/js/setup-globals' ],
 	testPathIgnorePatterns: [
 		'<rootDir>/.git',

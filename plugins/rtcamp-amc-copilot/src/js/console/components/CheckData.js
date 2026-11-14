@@ -1,7 +1,7 @@
 /**
  * WordPress dependencies
  */
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 import { external } from '@wordpress/icons';
 
 /**
@@ -155,12 +155,13 @@ export function DataValue( { name, value } ) {
  * with a `changelog_url` get an "Open changelog" action.
  *
  * @param {Object}   props
- * @param {string}   props.name   Data key the rows came from (used for the file name).
- * @param {Object[]} props.rows   Rows.
- * @param {string}   props.prefix File name prefix for the CSV export.
+ * @param {string}   props.name    Data key the rows came from (used for the file name).
+ * @param {Object[]} props.rows    Rows.
+ * @param {string}   props.prefix  File name prefix for the CSV export.
+ * @param {string}   [props.title] Name of the check, to tell tables with the same key in different checks apart.
  * @return {Element} Table.
  */
-export function RowsTable( { name, rows, prefix } ) {
+export function RowsTable( { name, rows, prefix, title } ) {
 	const keys = [
 		...new Set( rows.flatMap( ( row ) => Object.keys( row ) ) ),
 	].slice( 0, MAX_COLUMNS );
@@ -213,6 +214,16 @@ export function RowsTable( { name, rows, prefix } ) {
 			actions={ actions }
 			getItemId={ ( item ) => item.__row }
 			exportName={ `${ prefix }-${ name }` }
+			label={
+				title
+					? sprintf(
+							/* translators: 1: check name, 2: table name. */
+							__( '%1$s: %2$s', 'rtcamp-amc-copilot' ),
+							title,
+							labelFor( name )
+						)
+					: labelFor( name )
+			}
 			initialView={ { perPage: 10 } }
 		/>
 	);
@@ -226,17 +237,23 @@ export function RowsTable( { name, rows, prefix } ) {
  * @param {Object} props
  * @param {Object} props.data    The data object.
  * @param {string} props.prefix  File name prefix for CSV exports.
+ * @param {string} [props.title] Name of the check the data belongs to.
  * @param {number} [props.depth] Nesting level.
  * @return {Element|null} Rendered data.
  */
-export default function CheckData( { data, prefix, depth = 0 } ) {
+export default function CheckData( { data, prefix, title, depth = 0 } ) {
 	if ( ! isPlainObject( data ) || ! Object.keys( data ).length ) {
 		return null;
 	}
 
 	if ( depth >= MAX_DEPTH ) {
 		return (
-			<pre className="amc-json" tabIndex={ 0 }>
+			<pre
+				className="amc-json"
+				tabIndex={ 0 }
+				role="region"
+				aria-label={ __( 'Result data (JSON)', 'rtcamp-amc-copilot' ) }
+			>
 				{ JSON.stringify( data, null, 2 ) }
 			</pre>
 		);
@@ -274,6 +291,7 @@ export default function CheckData( { data, prefix, depth = 0 } ) {
 							name={ key }
 							rows={ value }
 							prefix={ prefix }
+							title={ title }
 						/>
 					) : (
 						<CheckData
@@ -283,6 +301,7 @@ export default function CheckData( { data, prefix, depth = 0 } ) {
 									: value
 							}
 							prefix={ `${ prefix }-${ key }` }
+							title={ title }
 							depth={ depth + 1 }
 						/>
 					) }

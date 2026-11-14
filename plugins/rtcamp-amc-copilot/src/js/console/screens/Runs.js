@@ -13,11 +13,18 @@ import { getRun, getRuns } from '../api';
 import DataTable from '../components/DataTable';
 import RunNowButton from '../components/RunNowButton';
 import ScreenState, { ErrorNotice } from '../components/ScreenState';
-import StatusBadge, { statusFromSeverity } from '../components/StatusBadge';
+import StatusBadge, {
+	severityLabel,
+	statusFromSeverity,
+} from '../components/StatusBadge';
 import useResource from '../hooks/useResource';
 import { dateField, enumField, numberField, textField } from '../utils/fields';
 import { formatDateTime, formatMs } from '../utils/format';
-import { navigate, useLocation } from '../utils/navigation';
+import {
+	navigate,
+	useFocusHeadingOnClose,
+	useLocation,
+} from '../utils/navigation';
 
 const triggerElements = () => [
 	{ value: 'cron', label: __( 'Cron', 'rtcamp-amc-copilot' ) },
@@ -76,7 +83,14 @@ function RunDataModal( { runId, onClose } ) {
 			onRequestClose={ onClose }
 			size="large"
 		>
-			{ isLoading && ! run && <Spinner /> }
+			{ isLoading && ! run && (
+				<p role="status">
+					<Spinner />{ ' ' }
+					<span className="screen-reader-text">
+						{ __( 'Loading the run…', 'rtcamp-amc-copilot' ) }
+					</span>
+				</p>
+			) }
 			{ error && <ErrorNotice error={ error } /> }
 			{ run && (
 				<>
@@ -99,12 +113,12 @@ function RunDataModal( { runId, onClose } ) {
 					</p>
 					{ run.findings?.length > 0 && (
 						<>
-							<h4>
+							<h2>
 								{ __(
 									'Findings from this run',
 									'rtcamp-amc-copilot'
 								) }
-							</h4>
+							</h2>
 							<ul className="amc-list">
 								{ run.findings.map( ( finding ) => (
 									<li key={ finding.id }>
@@ -112,7 +126,9 @@ function RunDataModal( { runId, onClose } ) {
 											status={ statusFromSeverity(
 												finding.severity
 											) }
-											label={ finding.severity }
+											label={ severityLabel(
+												finding.severity
+											) }
 										/>{ ' ' }
 										{ finding.title }
 									</li>
@@ -120,10 +136,11 @@ function RunDataModal( { runId, onClose } ) {
 							</ul>
 						</>
 					) }
-					<h4>{ __( 'Result data', 'rtcamp-amc-copilot' ) }</h4>
+					<h2>{ __( 'Result data', 'rtcamp-amc-copilot' ) }</h2>
 					<pre
 						className="amc-json"
 						tabIndex={ 0 }
+						role="region"
 						aria-label={ __(
 							'Run data (JSON)',
 							'rtcamp-amc-copilot'
@@ -146,6 +163,7 @@ function RunDataModal( { runId, onClose } ) {
 export default function Runs() {
 	const { data, error, isLoading, reload } = useResource( getRuns );
 	const { run: runArg } = useLocation();
+	useFocusHeadingOnClose( !! runArg );
 
 	const fields = useMemo(
 		() => [
@@ -154,6 +172,11 @@ export default function Runs() {
 					<Button
 						variant="link"
 						onClick={ () => navigate( 'runs', { run: item.id } ) }
+						aria-label={ sprintf(
+							/* translators: %d: run id. */
+							__( 'View data for run #%d', 'rtcamp-amc-copilot' ),
+							item.id
+						) }
 					>
 						{ `#${ item.id }` }
 					</Button>
@@ -250,6 +273,7 @@ export default function Runs() {
 					fields={ fields }
 					actions={ actions }
 					exportName="amc-runs"
+					label={ __( 'Run history', 'rtcamp-amc-copilot' ) }
 					initialView={ {
 						fields: fields
 							.map( ( f ) => f.id )

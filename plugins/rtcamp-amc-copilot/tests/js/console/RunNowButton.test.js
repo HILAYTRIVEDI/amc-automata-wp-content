@@ -5,15 +5,34 @@ import { act, advance, describeWithDom, render } from './test-utils';
 
 // Lightweight stand-ins keep this test independent of the full
 // @wordpress/components tree; only the markup the assertions need.
+jest.mock( '@wordpress/a11y', () => ( { speak: jest.fn() } ) );
+
 jest.mock( '@wordpress/components', () => ( {
-	Button: ( { children, disabled, onClick } ) => (
-		<button type="button" disabled={ disabled } onClick={ onClick }>
+	Button: ( {
+		children,
+		disabled,
+		onClick,
+		'aria-busy': ariaBusy,
+		'aria-label': ariaLabel,
+	} ) => (
+		<button
+			type="button"
+			disabled={ disabled }
+			onClick={ onClick }
+			aria-busy={ ariaBusy }
+			aria-label={ ariaLabel }
+		>
 			{ children }
 		</button>
 	),
 	Spinner: () => <span className="components-spinner" />,
-	Notice: ( { status, children } ) => (
-		<div className={ `components-notice is-${ status }` }>{ children }</div>
+	Notice: ( { status, children, spokenMessage } ) => (
+		<div
+			className={ `components-notice is-${ status }` }
+			data-spoken-message={ spokenMessage }
+		>
+			{ children }
+		</div>
 	),
 } ) );
 
@@ -24,6 +43,7 @@ jest.mock( '../../../src/js/console/api', () => ( {
 } ) );
 
 let RunNowButton;
+let speak;
 let runCheck;
 let rerunRun;
 let getRunStatuses;
@@ -43,9 +63,11 @@ describeWithDom( 'RunNowButton', () => {
 			rerunRun,
 			getRunStatuses,
 		} = require( '../../../src/js/console/api' ) );
+		( { speak } = require( '@wordpress/a11y' ) );
 	} );
 
 	beforeEach( () => {
+		speak.mockReset();
 		jest.useFakeTimers();
 		runCheck.mockReset();
 		rerunRun.mockReset();
@@ -200,5 +222,107 @@ describeWithDom( 'RunNowButton', () => {
 		await unmount();
 		await advance( 5000 );
 		expect( getRunStatuses ).toHaveBeenCalledTimes( 1 );
+	} );
+
+	describe( 'announcements and busy state', () => {
+		it( 'marks the button busy with a label that keeps the action name, and announces the start', async () => {
+			runCheck.mockResolvedValue( {
+				runs: [ { check_id: 'a.b', run_id: 1 } ],
+			} );
+			getRunStatuses.mockResolvedValue( [
+				{ id: 1, status: 'running' },
+			] );
+			const { container, unmount } = await render(
+				<RunNowButton
+					checkIds="all"
+					label="Run all checks"
+					pollInterval={ 500 }
+				/>
+			);
+			const button = () => container.querySelector( 'button' );
+			expect( button().getAttribute( 'aria-busy' ) ).toBe( 'false' );
+			expect( button().getAttribute( 'aria-label' ) ).toBeNull();
+
+			await click( container );
+			expect( button().getAttribute( 'aria-busy' ) ).toBe( 'true' );
+			expect( button().disabled ).toBe( true );
+			expect( button().getAttribute( 'aria-label' ) ).toBe(
+				'Run all checks: Queued…'
+			);
+			expect( speak ).toHaveBeenCalledTimes( 1 );
+			expect( speak.mock.calls[ 0 ][ 0 ] ).toContain( 'Run all checks' );
+			expect( speak.mock.calls[ 0 ][ 1 ] ).toBe( 'polite' );
+
+			await advance( 500 );
+			expect( button().getAttribute( 'aria-label' ) ).toBe(
+				'Run all checks: Running…'
+			);
+			// Progress changes are not spoken again; only start and result are.
+			expect( speak ).toHaveBeenCalledTimes( 1 );
+			await unmount();
+		} );
+
+		it( "speaks a finished result politely and mutes the notice's own announcement", async () => {
+			runCheck.mockResolvedValue( {
+				runs: [ { check_id: 'a.b', run_id: 1 } ],
+			} );
+			getRunStatuses.mockResolvedValue( [
+				{ id: 1, status: 'pass', summary: 'No issues found.' },
+			] );
+			const { container, unmount } = await render(
+				<RunNowButton checkIds="a.b" pollInterval={ 500 } />
+			);
+			await click( container );
+			await advance( 500 );
+			expect( speak ).toHaveBeenLastCalledWith(
+				'No issues found.',
+				'polite'
+			);
+			// Without this the notice would read the same text a second time.
+			expect(
+				container
+					.querySelector( '.components-notice' )
+					.getAttribute( 'data-spoken-message' )
+			).toBe( '' );
+			expect( container.querySelector( 'button' ).disabled ).toBe(
+				false
+			);
+			expect(
+				container.querySelector( 'button' ).getAttribute( 'aria-busy' )
+			).toBe( 'false' );
+			await unmount();
+		} );
+
+		it( 'speaks a check that could not run assertively', async () => {
+			runCheck.mockResolvedValue( {
+				runs: [ { check_id: 'a.b', run_id: 1 } ],
+			} );
+			getRunStatuses.mockResolvedValue( [
+				{ id: 1, status: 'error', summary: 'It threw.' },
+			] );
+			const { container, unmount } = await render(
+				<RunNowButton checkIds="a.b" pollInterval={ 500 } />
+			);
+			await click( container );
+			await advance( 500 );
+			expect( speak ).toHaveBeenLastCalledWith(
+				'It threw.',
+				'assertive'
+			);
+			await unmount();
+		} );
+
+		it( 'speaks a queueing failure assertively', async () => {
+			runCheck.mockRejectedValue( new Error( 'Forbidden' ) );
+			const { container, unmount } = await render(
+				<RunNowButton checkIds="all" />
+			);
+			await click( container );
+			expect( speak ).toHaveBeenLastCalledWith(
+				'Forbidden',
+				'assertive'
+			);
+			await unmount();
+		} );
 	} );
 } );

@@ -104,7 +104,19 @@ export default function Errors() {
 				'sparkline',
 				__( '30 days', 'rtcamp-amc-copilot' ),
 				( item ) => item.sparkline,
-				( item ) => <Sparkline values={ item.sparkline } />,
+				( item ) => (
+					<Sparkline
+						values={ item.sparkline }
+						label={ sprintf(
+							/* translators: %s: error message. */
+							__(
+								'Occurrences per day over 30 days for %s',
+								'rtcamp-amc-copilot'
+							),
+							item.message
+						) }
+					/>
+				),
 				{ enableSorting: false }
 			),
 			customField(
@@ -205,6 +217,10 @@ export default function Errors() {
 						actions={ actions }
 						getItemId={ ( item ) => item.signature }
 						exportName="amc-errors"
+						label={ __(
+							'Errors by signature',
+							'rtcamp-amc-copilot'
+						) }
 					/>
 				</>
 			) }

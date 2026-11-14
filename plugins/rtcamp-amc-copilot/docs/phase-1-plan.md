@@ -373,6 +373,25 @@ Each lane depends only on the frozen contract (check interface, table schema, RE
 
 **What the 2 days need.** Four engineers with Claude Code, one per lane (two engineers running two lanes each roughly doubles the review load and puts day 2 at risk). One pilot site with staging access before day 1 starts. The CVE provider's interface agreed in the first hour; the real provider can plug in later. The rtCamp logo SVG by day 2 midday.
 
+## Model routing
+
+Each lane and each follow-up task is executed by an AI agent. Work is assigned by complexity, so the expensive models only touch the hard parts and the cheap ones handle routine edits. Model names and prices change often: this table was last checked on Nov 14, 2026 against the OpenCode model catalogue and the Claude provider list.
+
+| Tier | Kind of work | Model | Price per million tokens (in / out) |
+| --- | --- | --- | --- |
+| Routine | Docs, CI YAML, lint fixes, small test fixes, copy edits | `opencode-go/deepseek-v4.1-flash` | $0.15 / $0.60 |
+| Standard | Check classes, REST endpoints, blocks, console screens, unit tests | `opencode-go/deepseek-v4-pro` | $0.66 / $1.98 |
+| Hard | Report snapshot and generator, CVE matching, security checks, UI architecture | `opencode-go/kimi-k3.1-pro` | $2 / $10 |
+
+**Rules**
+
+- One agent per task. The brief carries the frozen contract, the exact file list the agent may touch, and the checks that must pass; agents work in their own checkout so parallel tasks cannot collide.
+- Agents never merge their own pull request. The lead reviews and merges.
+- Every agent runs the CI checks locally before opening the pull request, and the pull request must be green before merge: PHPCS, PHPStan, PHPUnit, ESLint, Stylelint, Jest, Playwright and the VIP scan.
+- The Claude models (`claude-opus-5-5`, `claude-sonnet-5-5`, `claude-fable-5-2`, `claude-haiku-5-5`) are the fallback when an OpenCode route is down. They stay idle while the individual Claude spend limit is reached; that limit resets Nov 19, 2026 at 2:30am Asia/Calcutta.
+
+**Current assignment (UI rework).** The console and report UI rework runs as two parallel agents on `opencode-go/deepseek-v4-pro`: the engineer console shell and shared components, and the report block editor plus print styles and dashboard widget. The 12 console screens follow in a second wave once the shared components land, so every screen is built on the same core patterns.
+
 ## Testing and acceptance criteria
 
 **Test layers**

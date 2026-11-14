@@ -56,6 +56,7 @@ export default function CheckPanel( { checkId, result } ) {
 						<CheckData
 							data={ result.data }
 							prefix={ `amc-${ checkId }` }
+							title={ title }
 						/>
 					</>
 				) : (

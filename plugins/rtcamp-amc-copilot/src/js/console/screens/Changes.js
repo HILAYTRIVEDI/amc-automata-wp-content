@@ -183,6 +183,7 @@ export default function Changes() {
 					data={ data.items }
 					fields={ fields }
 					exportName="amc-changes"
+					label={ __( 'Change log', 'rtcamp-amc-copilot' ) }
 					isLoading={ isLoading }
 				/>
 			) }
