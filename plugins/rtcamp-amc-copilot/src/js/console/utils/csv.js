@@ -43,3 +43,41 @@ export const downloadCsv = ( filename, csv ) => {
 	document.body.removeChild( link );
 	window.URL.revokeObjectURL( url );
 };
+
+/**
+ * Value of a field for an item, resolved to display text for CSV (option
+ * values are exported as their labels).
+ *
+ * @param {Object} field Field definition (DataViews shape).
+ * @param {Object} item  Row.
+ * @return {unknown} Cell value.
+ */
+export const fieldValue = ( field, item ) => {
+	const value = field.getValue
+		? field.getValue( { item } )
+		: item[ field.id ];
+	const option = field.elements?.find(
+		( element ) => element.value === value
+	);
+	return option ? option.label : value;
+};
+
+/**
+ * Download rows as CSV with one column per field (every field, including
+ * ones hidden from the table, so the CSV always carries the full row).
+ *
+ * @param {string}   filename File name, without extension.
+ * @param {Object[]} fields   Field definitions.
+ * @param {Object[]} rows     Rows to export.
+ */
+export const exportFieldsCsv = ( filename, fields, rows ) => {
+	downloadCsv(
+		filename,
+		toCsv(
+			fields.map( ( field ) => field.label ?? field.id ),
+			rows.map( ( item ) =>
+				fields.map( ( field ) => fieldValue( field, item ) )
+			)
+		)
+	);
+};

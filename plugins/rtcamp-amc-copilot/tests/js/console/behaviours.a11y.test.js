@@ -126,6 +126,7 @@ describeWithDom( 'Console accessibility behaviours', () => {
 					] }
 					fields={ fields }
 					exportName="amc-test"
+					variant="full"
 					{ ...props }
 				/>
 			);
@@ -168,6 +169,97 @@ describeWithDom( 'Console accessibility behaviours', () => {
 				container.querySelector( 'input[type="search"]' ).labels[ 0 ]
 					.textContent
 			).toBe( 'Search' );
+			await unmount();
+		} );
+
+		it( 'draws a short list without actions as a core list table with its export', async () => {
+			const { container, unmount } = await renderTable( {
+				label: 'People',
+				variant: 'auto',
+			} );
+			const table = container.querySelector( 'table' );
+			expect( table.className ).toBe( 'widefat striped' );
+			// Named by a caption, with real column headers and no DataViews toolbar.
+			expect( table.querySelector( 'caption' ).textContent ).toBe(
+				'People'
+			);
+			expect(
+				table.querySelector( 'thead th' ).getAttribute( 'scope' )
+			).toBe( 'col' );
+			expect(
+				container.querySelector( 'input[type="search"]' )
+			).toBeNull();
+			expect( container.querySelectorAll( 'tbody tr' ) ).toHaveLength(
+				2
+			);
+			const exportButton = [
+				...container.querySelectorAll( 'button' ),
+			].find( ( b ) => b.textContent === 'Export CSV' );
+			expect( exportButton.className ).toBe( 'button' );
+			expect( exportButton.getAttribute( 'aria-label' ) ).toBe(
+				'Export CSV: People'
+			);
+			expect(
+				container.querySelector( '.displaying-num' ).textContent
+			).toBe( '2 items' );
+			await expectNoViolations( container );
+			await unmount();
+		} );
+
+		it( 'uses DataViews for a short list that has row actions', async () => {
+			const { container, unmount } = await renderTable( {
+				label: 'People',
+				variant: 'auto',
+				actions: [ { id: 'noop', label: 'Do it', callback: () => {} } ],
+			} );
+			expect(
+				container.querySelector( 'table.dataviews-view-table' )
+			).not.toBeNull();
+			await unmount();
+		} );
+
+		it( 'announces the CSV export from a compact table too', async () => {
+			URL.createObjectURL = jest.fn( () => 'blob:x' );
+			URL.revokeObjectURL = jest.fn();
+			jest.spyOn(
+				window.HTMLAnchorElement.prototype,
+				'click'
+			).mockImplementation( () => {} );
+			const { container, unmount } = await renderTable( {
+				label: 'People',
+				variant: 'compact',
+			} );
+			await clickButton( container, 'Export CSV' );
+			expect( speak ).toHaveBeenCalledWith(
+				'CSV export started: 2 rows.',
+				'polite'
+			);
+			await unmount();
+		} );
+
+		it( 'shows the first rows of a long compact list and expands on request', async () => {
+			const SimpleTable =
+				require( '../../../src/js/console/components/SimpleTable' ).default;
+			const data = Array.from( { length: 8 }, ( _, i ) => ( {
+				id: i + 1,
+				name: `Row ${ i + 1 }`,
+			} ) );
+			const { container, unmount } = await render(
+				<SimpleTable
+					data={ data }
+					fields={ fields }
+					label="Rows"
+					limit={ 5 }
+				/>
+			);
+			expect( container.querySelectorAll( 'tbody tr' ) ).toHaveLength(
+				5
+			);
+			const toggle = await clickButton( container, 'Show all 8' );
+			expect( container.querySelectorAll( 'tbody tr' ) ).toHaveLength(
+				8
+			);
+			expect( toggle.getAttribute( 'aria-expanded' ) ).toBe( 'true' );
 			await unmount();
 		} );
 
@@ -321,8 +413,7 @@ describeWithDom( 'Console accessibility behaviours', () => {
 				require( '../../../src/js/console/screens/Settings' ).default;
 			const { container, unmount } = await render( <Settings /> );
 			await settle( 200 );
-			// Open the Notifications panel.
-			await clickButton( container, 'Notifications' );
+			// Recipients is on the General tab, which is open first.
 			const field = container.querySelector( 'textarea' );
 			expect( field ).not.toBeNull();
 			// Visible, associated label.
@@ -363,23 +454,56 @@ describeWithDom( 'Console accessibility behaviours', () => {
 			await unmount();
 		} );
 
-		it( 'names the per-check toggles with the check, keeping the visible On/Off text in the name', async () => {
+		it( 'names each schedule checkbox and interval with its check', async () => {
 			const Settings =
 				require( '../../../src/js/console/screens/Settings' ).default;
 			const { container, unmount } = await render( <Settings /> );
 			await settle( 200 );
+			const tablist = container.querySelector( '[role="tablist"]' );
+			expect( tablist.getAttribute( 'aria-label' ) ).toBe(
+				'Settings sections'
+			);
 			await clickButton( container, 'Check schedule' );
 			await settle( 100 );
-			const toggle = container.querySelector(
-				'.components-toggle-control input[type="checkbox"]'
+			const checkbox = container.querySelector(
+				'.amc-simple-table input[type="checkbox"]'
 			);
 			const label = container.querySelector(
-				`label[for="${ toggle.id }"]`
+				`label[for="${ checkbox.id }"]`
 			);
-			expect( label.textContent ).toMatch( /^Enable .+: (On|Off)$/ );
-			expect( label.textContent ).toContain(
-				toggle.checked ? 'On' : 'Off'
+			// Visible text first ("Enabled"), then the check for screen readers.
+			expect( label.textContent ).toMatch( /^ ?Enabled: .+$/ );
+			const select = container.querySelector(
+				'.amc-simple-table select'
 			);
+			expect( select.getAttribute( 'aria-label' ) ).toMatch(
+				/^Interval for .+$/
+			);
+			await expectNoViolations( container );
+			await unmount();
+		} );
+
+		it( 'returns to the General tab and focuses the invalid field when saving from another tab', async () => {
+			const Settings =
+				require( '../../../src/js/console/screens/Settings' ).default;
+			const { container, unmount } = await render( <Settings /> );
+			await settle( 200 );
+			await setValue(
+				container.querySelector( '#amc-setting-recipients' ),
+				'nope'
+			);
+			await clickButton( container, 'Check schedule' );
+			await settle( 100 );
+			expect(
+				container.querySelector( '#amc-setting-recipients' )
+			).toBeNull();
+			await clickButton( container, 'Save settings' );
+			await settle( 100 );
+			const field = container.querySelector( '#amc-setting-recipients' );
+			expect( field ).not.toBeNull();
+			expect( field.value ).toBe( 'nope' );
+			expect( document.activeElement ).toBe( field );
+			expect( field.getAttribute( 'aria-invalid' ) ).toBe( 'true' );
 			await unmount();
 		} );
 	} );
@@ -463,12 +587,37 @@ describeWithDom( 'Console accessibility behaviours', () => {
 				nav.querySelector( '[aria-current="page"]' ).textContent
 			).toBe( 'Overview' );
 
+			// Six section tabs, so the row does not wrap.
+			expect( nav.querySelectorAll( 'a.nav-tab' ) ).toHaveLength( 6 );
+			// Overview has one screen: no sub-navigation.
+			expect( container.querySelector( '.subsubsub' ) ).toBeNull();
+
 			await act( async () => navigate( 'updates' ) );
 			await settle( 100 );
 			expect( speak ).toHaveBeenCalledWith( 'Updates screen', 'polite' );
+			// The section tab is current; the screen link in its sub-navigation is the page.
+			const active = nav.querySelector( '.nav-tab-active' );
+			expect( active.textContent ).toBe( 'Checks' );
+			expect( active.getAttribute( 'aria-current' ) ).toBe( 'true' );
+			const subnav = container.querySelectorAll( 'nav' )[ 1 ];
+			expect( subnav.getAttribute( 'aria-label' ) ).toBe(
+				'Checks screens'
+			);
 			expect(
-				nav.querySelector( '[aria-current="page"]' ).textContent
+				subnav.querySelector( '[aria-current="page"]' ).textContent
 			).toBe( 'Updates' );
+			expect(
+				[ ...subnav.querySelectorAll( 'a' ) ].map(
+					( a ) => a.textContent
+				)
+			).toEqual( [
+				'Updates',
+				'Vulnerabilities',
+				'Security',
+				'Errors',
+				'Smoke checks',
+				'Performance',
+			] );
 			// One h1, then the screen's h2.
 			expect( container.querySelectorAll( 'h1' ) ).toHaveLength( 1 );
 			expect( container.querySelector( 'h2' ).textContent ).toBe(

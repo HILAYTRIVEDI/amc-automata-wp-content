@@ -1,7 +1,6 @@
 /**
  * WordPress dependencies
  */
-import { Card, CardBody, CardHeader } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
 
 /**
@@ -10,6 +9,7 @@ import { __, sprintf } from '@wordpress/i18n';
 import { formatDateTime } from '../utils/format';
 import CheckData from './CheckData';
 import FindingLink from './FindingLink';
+import Postbox from './Postbox';
 import StatusBadge from './StatusBadge';
 
 const STATUS = { error: 'warn', queued: 'info', running: 'info' };
@@ -21,54 +21,57 @@ const STATUS = { error: 'warn', queued: 'info', running: 'info' };
  * @param {Object}      props
  * @param {string}      props.checkId Check id.
  * @param {Object|null} props.result  `{ run, data }` from the screen endpoint, or null if the check never ran.
- * @return {Element} Card.
+ * @return {Element} Box.
  */
 export default function CheckPanel( { checkId, result } ) {
 	const title = result?.run.check_label ?? checkId;
 
 	return (
-		<Card className="amc-check-panel" size="small">
-			<CardHeader>
-				<h3 className="amc-check-panel-title">{ title }</h3>
-				{ result && (
+		<Postbox
+			className="amc-check-panel"
+			title={ title }
+			actions={
+				result ? (
 					<StatusBadge
 						status={
 							STATUS[ result.run.status ] ?? result.run.status
 						}
 					/>
-				) }
-			</CardHeader>
-			<CardBody>
-				{ result ? (
-					<>
-						<p>{ result.run.summary }</p>
-						<p className="description">
-							{ sprintf(
-								/* translators: %s: date and time. */
-								__( 'Last run %s.', 'rtcamp-amc-copilot' ),
-								formatDateTime(
-									result.run.finished_at ??
-										result.run.created_at
-								)
-							) }{ ' ' }
-							<FindingLink runId={ result.run.id } />
-						</p>
-						<CheckData
-							data={ result.data }
-							prefix={ `amc-${ checkId }` }
-							title={ title }
-						/>
-					</>
 				) : (
-					<p>
-						{ __(
-							'This check has not run yet. Run it, or wait for its schedule.',
-							'rtcamp-amc-copilot'
-						) }
+					<span className="description">
+						{ __( 'Not run yet', 'rtcamp-amc-copilot' ) }
+					</span>
+				)
+			}
+		>
+			{ result ? (
+				<>
+					<p className="amc-check-summary">{ result.run.summary }</p>
+					<p className="description">
+						{ sprintf(
+							/* translators: %s: date and time. */
+							__( 'Last run %s.', 'rtcamp-amc-copilot' ),
+							formatDateTime(
+								result.run.finished_at ?? result.run.created_at
+							)
+						) }{ ' ' }
+						<FindingLink runId={ result.run.id } />
 					</p>
-				) }
-			</CardBody>
-		</Card>
+					<CheckData
+						data={ result.data }
+						prefix={ `amc-${ checkId }` }
+						title={ title }
+					/>
+				</>
+			) : (
+				<p>
+					{ __(
+						'This check has not run yet. Run it, or wait for its schedule.',
+						'rtcamp-amc-copilot'
+					) }
+				</p>
+			) }
+		</Postbox>
 	);
 }
 

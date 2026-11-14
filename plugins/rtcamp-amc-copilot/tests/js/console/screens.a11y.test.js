@@ -12,7 +12,7 @@ jest.mock( '@wordpress/a11y', () => ( { speak: jest.fn() } ) );
 
 // Screen and a selector proving its data (not just the loading state) rendered.
 const SCREENS = [
-	[ 'Overview', 'table' ],
+	[ 'Overview', '.amc-columns table.widefat' ],
 	[ 'Updates', '.amc-check-panel' ],
 	[ 'Vulnerabilities', 'table' ],
 	[ 'Errors', 'table' ],
@@ -23,7 +23,7 @@ const SCREENS = [
 	[ 'Changes', 'table' ],
 	[ 'Runs', 'table' ],
 	[ 'Reports', 'table' ],
-	[ 'Settings', '.components-panel__body' ],
+	[ 'Settings', '.form-table' ],
 ];
 
 jest.setTimeout( 60000 );

@@ -5,37 +5,29 @@ import { speak } from '@wordpress/a11y';
 import { Button } from '@wordpress/components';
 import { DataViews, filterSortAndPaginate } from '@wordpress/dataviews';
 import { useEffect, useMemo, useRef, useState } from '@wordpress/element';
-import { __, _n, sprintf } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 import { download } from '@wordpress/icons';
 
 /**
  * Internal dependencies
  */
-import { downloadCsv, toCsv } from '../utils/csv';
+import { exportFieldsCsv } from '../utils/csv';
+import SimpleTable, { exportMessage } from './SimpleTable';
 
 const DEFAULT_LAYOUTS = { table: {} };
 
 /**
- * Value of a field for an item, resolved to display text for CSV (option
- * values are exported as their labels).
- *
- * @param {Object} field Field definition.
- * @param {Object} item  Row.
- * @return {unknown} Cell value.
+ * Lists with at most this many rows and no row actions are drawn as a plain
+ * core list table (see `SimpleTable`) unless a screen asks for the full view.
  */
-const cellValue = ( field, item ) => {
-	const value = field.getValue
-		? field.getValue( { item } )
-		: item[ field.id ];
-	const option = field.elements?.find(
-		( element ) => element.value === value
-	);
-	return option ? option.label : value;
-};
+export const COMPACT_MAX_ROWS = 10;
 
 /**
- * `@wordpress/dataviews` table with filtering, sorting, search, pagination
- * and a CSV export of the filtered rows (all fields, search and filters applied).
+ * A list with its CSV export. Long lists, and lists with row actions, use
+ * `@wordpress/dataviews` (search, filters, sorting, pagination; the export
+ * holds the filtered rows with every field). Short lists without actions use
+ * a core `widefat striped` table instead (`SimpleTable`), so a box with three
+ * rows is not buried under a toolbar.
  *
  * @param {Object}                          props
  * @param {Object[]}                        props.data          All rows (filtering and paging happen here).
@@ -52,6 +44,9 @@ const cellValue = ( field, item ) => {
  * @param {string}                          [props.searchLabel] Accessible search label (defaults to "Search" plus `label`).
  * @param {Element}                         [props.header]      Extra toolbar content.
  * @param {Element}                         [props.empty]       Empty state.
+ * @param {string}                          [props.variant]     `auto` (default), `full` (always DataViews) or `compact`
+ *                                                              (always a core table; row actions are not shown).
+ * @param {string}                          [props.emptyText]   Text for an empty compact table.
  * @return {Element} Table.
  */
 export default function DataTable( {
@@ -66,6 +61,8 @@ export default function DataTable( {
 	searchLabel,
 	header,
 	empty,
+	variant = 'auto',
+	emptyText,
 } ) {
 	const wrapper = useRef( null );
 	const tableLabel = label ?? exportName;
@@ -109,32 +106,29 @@ export default function DataTable( {
 			{ ...view, page: 1, perPage: Math.max( data.length, 1 ) },
 			fields
 		);
-		// Every field is exported, including ones hidden from the table (such as
-		// a run's raw data), so the CSV always carries the full row.
-		const columns = fields;
-		downloadCsv(
-			exportName,
-			toCsv(
-				columns.map( ( field ) => field.label ?? field.id ),
-				filtered.map( ( item ) =>
-					columns.map( ( field ) => cellValue( field, item ) )
-				)
-			)
-		);
-		speak(
-			sprintf(
-				/* translators: %d: number of rows. */
-				_n(
-					'CSV export started: %d row.',
-					'CSV export started: %d rows.',
-					filtered.length,
-					'rtcamp-amc-copilot'
-				),
-				filtered.length
-			),
-			'polite'
-		);
+		exportFieldsCsv( exportName, fields, filtered );
+		speak( exportMessage( filtered.length ), 'polite' );
 	};
+
+	const compact =
+		'compact' === variant ||
+		( 'auto' === variant &&
+			! actions?.length &&
+			data.length <= COMPACT_MAX_ROWS );
+
+	if ( compact ) {
+		return (
+			<SimpleTable
+				data={ data }
+				fields={ fields }
+				getItemId={ getItemId }
+				label={ tableLabel }
+				exportName={ exportName }
+				columns={ initialView.fields }
+				emptyText={ emptyText }
+			/>
+		);
+	}
 
 	return (
 		<div

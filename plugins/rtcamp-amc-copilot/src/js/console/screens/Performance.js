@@ -1,7 +1,6 @@
 /**
  * WordPress dependencies
  */
-import { Card, CardBody, CardHeader } from '@wordpress/components';
 import { useMemo } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 
@@ -11,6 +10,7 @@ import { __ } from '@wordpress/i18n';
 import { getPerformance } from '../api';
 import { CheckPanels } from '../components/CheckPanel';
 import DataTable from '../components/DataTable';
+import Postbox from '../components/Postbox';
 import RunChecksButton from '../components/RunChecksButton';
 import ScreenState from '../components/ScreenState';
 import Sparkline from '../components/Sparkline';
@@ -75,10 +75,11 @@ export default function Performance() {
 
 	return (
 		<ScreenState
-			title={ __( 'Performance', 'rtcamp-amc-copilot' ) }
+			screen="performance"
 			actions={
 				<RunChecksButton
 					checkIds={ SCREEN_CHECKS.performance }
+					variant="primary"
 					label={ __( 'Run check', 'rtcamp-amc-copilot' ) }
 					onComplete={ reload }
 				/>
@@ -91,52 +92,50 @@ export default function Performance() {
 		>
 			{ data && (
 				<>
-					<Card className="amc-check-panel" size="small">
-						<CardHeader>
-							<h3 className="amc-check-panel-title">
-								{ __(
-									'Response time trend',
-									'rtcamp-amc-copilot'
-								) }
-							</h3>
-						</CardHeader>
-						<CardBody>
-							{ data.response_trend.length ? (
-								<>
+					<Postbox
+						className="amc-check-panel"
+						title={ __(
+							'Response time trend',
+							'rtcamp-amc-copilot'
+						) }
+					>
+						{ data.response_trend.length ? (
+							<>
+								<p className="amc-trend">
 									<Sparkline
 										values={ data.response_trend.map(
 											( point ) => point.avg_ms
 										) }
-										width={ 240 }
-										height={ 48 }
+										width={ 320 }
+										height={ 56 }
 										unit=" ms"
 										label={ __(
 											'Average response time per day',
 											'rtcamp-amc-copilot'
 										) }
 									/>
-									<DataTable
-										data={ data.response_trend }
-										fields={ trendFields }
-										getItemId={ ( item ) => item.date }
-										exportName="amc-performance-trend"
-										label={ __(
-											'Response time by day',
-											'rtcamp-amc-copilot'
-										) }
-										initialView={ { perPage: 7 } }
-									/>
-								</>
-							) : (
-								<p>
-									{ __(
-										'No response time data yet.',
+								</p>
+								<DataTable
+									data={ data.response_trend }
+									fields={ trendFields }
+									getItemId={ ( item ) => item.date }
+									exportName="amc-performance-trend"
+									label={ __(
+										'Response time by day',
 										'rtcamp-amc-copilot'
 									) }
-								</p>
-							) }
-						</CardBody>
-					</Card>
+									initialView={ { perPage: 7 } }
+								/>
+							</>
+						) : (
+							<p>
+								{ __(
+									'No response time data yet.',
+									'rtcamp-amc-copilot'
+								) }
+							</p>
+						) }
+					</Postbox>
 
 					<CheckPanels
 						ids={ SCREEN_CHECKS.performance.filter(
@@ -145,25 +144,33 @@ export default function Performance() {
 						checks={ data.checks }
 					/>
 
-					<h3>
-						{ __( 'Slow queries by caller', 'rtcamp-amc-copilot' ) }
-					</h3>
-					<p className="description">
-						{ __(
-							'Sampled on 1 in 100 requests; only queries over 100 ms are kept.',
-							'rtcamp-amc-copilot'
-						) }
-					</p>
-					<DataTable
-						data={ data.slow_queries }
-						fields={ queryFields }
-						getItemId={ ( item ) => item.signature }
-						exportName="amc-performance-slow-queries"
-						label={ __(
+					<Postbox
+						title={ __(
 							'Slow queries by caller',
 							'rtcamp-amc-copilot'
 						) }
-					/>
+					>
+						<p className="description">
+							{ __(
+								'Sampled on 1 in 100 requests; only queries over 100 ms are kept.',
+								'rtcamp-amc-copilot'
+							) }
+						</p>
+						<DataTable
+							data={ data.slow_queries }
+							fields={ queryFields }
+							getItemId={ ( item ) => item.signature }
+							exportName="amc-performance-slow-queries"
+							label={ __(
+								'Slow queries by caller',
+								'rtcamp-amc-copilot'
+							) }
+							emptyText={ __(
+								'No slow queries sampled.',
+								'rtcamp-amc-copilot'
+							) }
+						/>
+					</Postbox>
 				</>
 			) }
 		</ScreenState>

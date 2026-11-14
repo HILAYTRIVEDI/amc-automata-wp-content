@@ -1,16 +1,7 @@
 /**
  * WordPress dependencies
  */
-import {
-	Button,
-	Notice,
-	Panel,
-	PanelBody,
-	SelectControl,
-	TextControl,
-	TextareaControl,
-	ToggleControl,
-} from '@wordpress/components';
+import { Button, Modal, TabPanel } from '@wordpress/components';
 import {
 	useCallback,
 	useEffect,
@@ -19,7 +10,6 @@ import {
 	useState,
 } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
-import { trash } from '@wordpress/icons';
 
 /**
  * Internal dependencies
@@ -35,12 +25,12 @@ import {
 	saveSavedFields,
 	saveSettings,
 } from '../api';
-import DataTable from '../components/DataTable';
-import ScreenState, { ErrorNotice } from '../components/ScreenState';
+import ScreenState, { ErrorNotice, Loading } from '../components/ScreenState';
+import SimpleTable from '../components/SimpleTable';
 import { getIntervals } from '../constants';
 import useNotice from '../hooks/useNotice';
 import useResource from '../hooks/useResource';
-import { customField, enumField, textField, toElements } from '../utils/fields';
+import { customField, textField } from '../utils/fields';
 import { intervalLabel } from '../utils/format';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -85,18 +75,118 @@ const environmentOptions = () => [
 ];
 
 /**
+ * `aria-describedby` for a field whose help paragraph has the id
+ * `<id>-description` (only when there is help or an error to point at).
+ *
+ * @param {string}           id      Field id.
+ * @param {string|undefined} help    Help text.
+ * @param {string|undefined} [error] Error message.
+ * @return {string|undefined} Attribute value.
+ */
+const describedBy = ( id, help, error ) =>
+	help || error ? `${ id }-description` : undefined;
+
+/**
+ * One row of a core settings table (`form-table`): label in the header cell,
+ * the control and its description in the data cell.
+ *
+ * @param {Object}  props
+ * @param {string}  props.id       Control id (the label points at it).
+ * @param {string}  props.label    Label.
+ * @param {string}  [props.help]   Description under the control.
+ * @param {string}  [props.error]  Validation error, shown before the help.
+ * @param {Element} props.children Control.
+ * @return {Element} Row.
+ */
+function Row( { id, label, help, error, children } ) {
+	return (
+		<tr>
+			<th scope="row">
+				<label htmlFor={ id }>{ label }</label>
+			</th>
+			<td>
+				{ children }
+				{ ( help || error ) && (
+					<p className="description" id={ `${ id }-description` }>
+						{ withError( error, help ) }
+					</p>
+				) }
+			</td>
+		</tr>
+	);
+}
+
+/**
+ * A checkbox row as on core settings screens: the setting name in the header
+ * cell, a fieldset with the checkbox and its label in the data cell.
+ *
+ * @param {Object}                          props
+ * @param {string}                          props.id         Checkbox id.
+ * @param {string}                          props.title      Setting name.
+ * @param {string}                          props.label      Checkbox label.
+ * @param {string}                          [props.help]     Description.
+ * @param {boolean}                         props.checked    State.
+ * @param {boolean}                         [props.disabled] Disabled.
+ * @param {(...args: unknown[]) => unknown} props.onChange   Called with the new state.
+ * @return {Element} Row.
+ */
+function CheckboxRow( {
+	id,
+	title,
+	label,
+	help,
+	checked,
+	disabled,
+	onChange,
+} ) {
+	return (
+		<tr>
+			<th scope="row">{ title }</th>
+			<td>
+				<fieldset>
+					<legend className="screen-reader-text">
+						<span>{ title }</span>
+					</legend>
+					<label htmlFor={ id }>
+						<input
+							id={ id }
+							type="checkbox"
+							checked={ checked }
+							disabled={ disabled }
+							aria-describedby={ describedBy( id, help ) }
+							onChange={ ( event ) =>
+								onChange( event.target.checked )
+							}
+						/>{ ' ' }
+						{ label }
+					</label>
+					{ help && (
+						<p className="description" id={ `${ id }-description` }>
+							{ help }
+						</p>
+					) }
+				</fieldset>
+			</td>
+		</tr>
+	);
+}
+
+/**
  * Engineers with console access: list, grant and revoke
  * (`/access`; needs `amc_manage` and `manage_options`).
  *
- * @return {Element} Panel body content.
+ * @return {Element} Tab content.
  */
 function Engineers() {
 	const { data, error, reload } = useResource( getEngineers );
 	const users = useResource( getCandidateUsers );
 	const notice = useNotice();
 	const [ userId, setUserId ] = useState( '' );
+	const [ revoking, setRevoking ] = useState( null );
+	const [ busy, setBusy ] = useState( false );
 
 	const act = async ( promise, message ) => {
+		setBusy( true );
 		try {
 			await promise;
 			notice.success( message );
@@ -105,64 +195,38 @@ function Engineers() {
 			users.reload();
 		} catch ( err ) {
 			notice.error( err.message );
+		} finally {
+			setBusy( false );
 		}
 	};
 
 	const fields = useMemo(
 		() => [
-			textField( 'display_name', __( 'Name', 'rtcamp-amc-copilot' ) ),
+			textField( 'display_name', __( 'Name', 'rtcamp-amc-copilot' ), {
+				render: ( { item } ) => <strong>{ item.display_name }</strong>,
+			} ),
 			textField( 'login', __( 'Username', 'rtcamp-amc-copilot' ) ),
 			textField( 'email', __( 'Email', 'rtcamp-amc-copilot' ) ),
+			customField(
+				'revoke',
+				__( 'Actions', 'rtcamp-amc-copilot' ),
+				() => '',
+				( item ) => (
+					<Button
+						variant="link"
+						isDestructive
+						onClick={ () => setRevoking( item ) }
+						aria-label={ sprintf(
+							/* translators: %s: user name. */
+							__( 'Revoke access for %s', 'rtcamp-amc-copilot' ),
+							item.display_name
+						) }
+					>
+						{ __( 'Revoke access', 'rtcamp-amc-copilot' ) }
+					</Button>
+				)
+			),
 		],
-		[]
-	);
-
-	const actions = useMemo(
-		() => [
-			{
-				id: 'revoke',
-				label: __( 'Revoke access', 'rtcamp-amc-copilot' ),
-				icon: trash,
-				modalHeader: __( 'Revoke access', 'rtcamp-amc-copilot' ),
-				modalSize: 'small',
-				RenderModal: ( { items, closeModal } ) => (
-					<div>
-						<p>
-							{ sprintf(
-								/* translators: %s: user name. */
-								__(
-									'Remove console access for %s? They keep their normal site role.',
-									'rtcamp-amc-copilot'
-								),
-								items[ 0 ].display_name
-							) }
-						</p>
-						<div className="amc-modal-actions">
-							<Button variant="tertiary" onClick={ closeModal }>
-								{ __( 'Cancel', 'rtcamp-amc-copilot' ) }
-							</Button>
-							<Button
-								variant="primary"
-								isDestructive
-								onClick={ async () => {
-									await act(
-										revokeAccess( items[ 0 ].id ),
-										__(
-											'Access revoked.',
-											'rtcamp-amc-copilot'
-										)
-									);
-									closeModal();
-								} }
-							>
-								{ __( 'Revoke access', 'rtcamp-amc-copilot' ) }
-							</Button>
-						</div>
-					</div>
-				),
-			},
-		],
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 		[]
 	);
 
@@ -179,50 +243,112 @@ function Engineers() {
 				) }
 			</p>
 			{ notice.node }
+			{ ! data && <Loading /> }
 			{ data && (
-				<DataTable
+				<SimpleTable
 					data={ data }
 					fields={ fields }
-					actions={ actions }
+					columns={ [ 'display_name', 'login', 'email', 'revoke' ] }
 					exportName="amc-settings-engineers"
 					label={ __(
 						'Engineers with access',
 						'rtcamp-amc-copilot'
 					) }
+					emptyText={ __(
+						'No engineers have access yet.',
+						'rtcamp-amc-copilot'
+					) }
 				/>
 			) }
-			<div className="amc-filters">
-				<SelectControl
-					__nextHasNoMarginBottom
-					__next40pxDefaultSize
-					label={ __( 'Give access to', 'rtcamp-amc-copilot' ) }
-					value={ userId }
-					options={ [
-						{
-							value: '',
-							label: __( 'Choose a user…', 'rtcamp-amc-copilot' ),
-						},
-						...( users.data ?? [] ).map( ( user ) => ( {
-							value: String( user.id ),
-							label: `${ user.name } (${ user.slug })`,
-						} ) ),
-					] }
-					onChange={ setUserId }
-				/>
-				<Button
-					variant="secondary"
-					disabled={ ! userId }
-					accessibleWhenDisabled
-					onClick={ () =>
-						act(
-							grantAccess( Number( userId ) ),
-							__( 'Access granted.', 'rtcamp-amc-copilot' )
-						)
-					}
+			<table className="form-table" role="presentation">
+				<tbody>
+					<Row
+						id="amc-setting-grant-user"
+						label={ __( 'Give access to', 'rtcamp-amc-copilot' ) }
+					>
+						<select
+							id="amc-setting-grant-user"
+							value={ userId }
+							onChange={ ( event ) =>
+								setUserId( event.target.value )
+							}
+						>
+							<option value="">
+								{ __( 'Choose a user…', 'rtcamp-amc-copilot' ) }
+							</option>
+							{ ( users.data ?? [] ).map( ( user ) => (
+								<option
+									key={ user.id }
+									value={ String( user.id ) }
+								>
+									{ `${ user.name } (${ user.slug })` }
+								</option>
+							) ) }
+						</select>{ ' ' }
+						<Button
+							variant="secondary"
+							disabled={ ! userId || busy }
+							accessibleWhenDisabled
+							onClick={ () =>
+								act(
+									grantAccess( Number( userId ) ),
+									__(
+										'Access granted.',
+										'rtcamp-amc-copilot'
+									)
+								)
+							}
+						>
+							{ __( 'Grant access', 'rtcamp-amc-copilot' ) }
+						</Button>
+					</Row>
+				</tbody>
+			</table>
+			{ revoking && (
+				<Modal
+					title={ __( 'Revoke access', 'rtcamp-amc-copilot' ) }
+					size="small"
+					onRequestClose={ () => setRevoking( null ) }
 				>
-					{ __( 'Grant access', 'rtcamp-amc-copilot' ) }
-				</Button>
-			</div>
+					<p>
+						{ sprintf(
+							/* translators: %s: user name. */
+							__(
+								'Remove console access for %s? They keep their normal site role.',
+								'rtcamp-amc-copilot'
+							),
+							revoking.display_name
+						) }
+					</p>
+					<div className="amc-modal-actions">
+						<Button
+							variant="tertiary"
+							onClick={ () => setRevoking( null ) }
+						>
+							{ __( 'Cancel', 'rtcamp-amc-copilot' ) }
+						</Button>
+						<Button
+							variant="primary"
+							isDestructive
+							isBusy={ busy }
+							disabled={ busy }
+							accessibleWhenDisabled
+							onClick={ async () => {
+								await act(
+									revokeAccess( revoking.id ),
+									__(
+										'Access revoked.',
+										'rtcamp-amc-copilot'
+									)
+								);
+								setRevoking( null );
+							} }
+						>
+							{ __( 'Revoke access', 'rtcamp-amc-copilot' ) }
+						</Button>
+					</div>
+				</Modal>
+			) }
 		</>
 	);
 }
@@ -231,12 +357,13 @@ function Engineers() {
  * Saved report fields: carried-forward values (`/saved-fields`). Saving is
  * lane D1 and shows "not available yet" until it ships.
  *
- * @return {Element} Panel body content.
+ * @return {Element} Tab content.
  */
 function SavedFieldsEditor() {
 	const { data, error } = useResource( getSavedFields );
 	const [ values, setValues ] = useState( null );
 	const [ problem, setProblem ] = useState( null );
+	const [ saving, setSaving ] = useState( false );
 	const notice = useNotice();
 
 	useEffect( () => {
@@ -252,7 +379,8 @@ function SavedFieldsEditor() {
 						( [ section, keys ] ) =>
 							keys.map( ( key ) => ( {
 								id: `${ section }.${ key }`,
-								section,
+								section: section.replace( /_/g, ' ' ),
+								sectionKey: section,
 								key,
 								label: key.replace( /_/g, ' ' ),
 								value: values[ section ]?.[ key ] ?? '',
@@ -271,21 +399,21 @@ function SavedFieldsEditor() {
 				__( 'Value', 'rtcamp-amc-copilot' ),
 				( item ) => item.value,
 				( item ) => (
-					<TextControl
-						__nextHasNoMarginBottom
-						__next40pxDefaultSize
-						hideLabelFromVision
-						label={ `${ item.section }: ${ item.label }` }
+					<input
+						type="text"
+						className="regular-text"
+						aria-label={ `${ item.section }: ${ item.label }` }
 						value={ item.value }
-						onChange={ ( value ) =>
+						onChange={ ( event ) => {
+							const { value } = event.target;
 							setValues( ( current ) => ( {
 								...current,
-								[ item.section ]: {
-									...current[ item.section ],
+								[ item.sectionKey ]: {
+									...current[ item.sectionKey ],
 									[ item.key ]: value,
 								},
-							} ) )
-						}
+							} ) );
+						} }
 					/>
 				)
 			),
@@ -295,6 +423,7 @@ function SavedFieldsEditor() {
 
 	const save = async () => {
 		setProblem( null );
+		setSaving( true );
 		try {
 			await saveSavedFields( values );
 			notice.success(
@@ -302,6 +431,8 @@ function SavedFieldsEditor() {
 			);
 		} catch ( err ) {
 			setProblem( err );
+		} finally {
+			setSaving( false );
 		}
 	};
 
@@ -311,33 +442,51 @@ function SavedFieldsEditor() {
 
 	return (
 		<>
+			<p className="description">
+				{ __(
+					'Stable facts carried forward into every new report. Publishing a report updates them too.',
+					'rtcamp-amc-copilot'
+				) }
+			</p>
 			{ notice.node }
 			{ problem && <ErrorNotice error={ problem } /> }
+			{ ! data && <Loading /> }
 			{ data && (
-				<DataTable
+				<SimpleTable
 					data={ rows }
 					fields={ fields }
 					exportName="amc-settings-saved-fields"
 					label={ __( 'Saved report fields', 'rtcamp-amc-copilot' ) }
-					initialView={ { perPage: 20 } }
 				/>
 			) }
-			<Button
-				variant="secondary"
-				onClick={ save }
-				disabled={ ! values }
-				accessibleWhenDisabled
-			>
-				{ __( 'Save saved fields', 'rtcamp-amc-copilot' ) }
-			</Button>
+			<p className="submit">
+				<Button
+					variant="primary"
+					onClick={ save }
+					isBusy={ saving }
+					disabled={ ! values || saving }
+					accessibleWhenDisabled
+				>
+					{ __( 'Save saved fields', 'rtcamp-amc-copilot' ) }
+				</Button>
+			</p>
 		</>
 	);
 }
 
+const TABS = () => [
+	{ name: 'general', title: __( 'General', 'rtcamp-amc-copilot' ) },
+	{ name: 'schedule', title: __( 'Check schedule', 'rtcamp-amc-copilot' ) },
+	{ name: 'access', title: __( 'Engineers', 'rtcamp-amc-copilot' ) },
+	{ name: 'fields', title: __( 'Report fields', 'rtcamp-amc-copilot' ) },
+];
+
 /**
- * Settings screen (`GET`/`POST /settings`): site, notifications, smoke
- * credentials, the check schedule, engineers with access, saved report
- * fields, disclaimers, retention and the kill switch.
+ * Settings screen (`GET`/`POST /settings`), laid out like core's settings
+ * pages (`form-table`, a "Save" button under the form), in four tabs:
+ * General (site, notifications, smoke credentials, data and kill switch,
+ * report disclaimers), Check schedule, Engineers with access, and saved
+ * report fields.
  *
  * @return {Element} Screen.
  */
@@ -351,6 +500,12 @@ export default function Settings() {
 	const [ overrides, setOverrides ] = useState( {} );
 	const [ saving, setSaving ] = useState( false );
 	const [ errors, setErrors ] = useState( {} );
+	const [ tab, setTab ] = useState( 'general' );
+	// TabPanel is uncontrolled: remounting it with a new key is how a failed
+	// save switches back to the tab holding the invalid field.
+	const [ tabsKey, setTabsKey ] = useState( 0 );
+	const pendingFocus = useRef( null );
+	const tabsRef = useRef( null );
 	const recipientsRef = useRef( null );
 	const digestTimeRef = useRef( null );
 
@@ -361,6 +516,31 @@ export default function Settings() {
 			setOverrides( data.checks );
 		}
 	}, [ data ] );
+
+	// Name the tab list (TabPanel has no prop for it) and move focus to a
+	// field a failed save pointed at once its tab is showing.
+	useEffect( () => {
+		tabsRef.current
+			?.querySelector( '[role="tablist"]' )
+			?.setAttribute(
+				'aria-label',
+				__( 'Settings sections', 'rtcamp-amc-copilot' )
+			);
+		if ( pendingFocus.current?.current ) {
+			pendingFocus.current.current.focus();
+			pendingFocus.current = null;
+		}
+	} );
+
+	const focusField = ( ref ) => {
+		if ( 'general' === tab ) {
+			ref.current?.focus();
+			return;
+		}
+		pendingFocus.current = ref;
+		setTab( 'general' );
+		setTabsKey( ( key ) => key + 1 );
+	};
 
 	const set = ( key ) => ( value ) => {
 		setErrors( ( current ) => ( { ...current, [ key ]: undefined } ) );
@@ -387,78 +567,61 @@ export default function Settings() {
 
 	const checkRows = useMemo(
 		() =>
-			( checksResource.data ?? [] ).map( ( check ) => ( {
-				id: check.id,
-				label: check.label,
-				group_label: check.group_label,
-				default_schedule: check.default_schedule,
-				enabled: overrides[ check.id ]?.enabled ?? true,
-				interval: overrides[ check.id ]?.interval ?? '',
-			} ) ),
+			( checksResource.data ?? [] )
+				.map( ( check ) => ( {
+					id: check.id,
+					label: check.label,
+					group_label: check.group_label,
+					default_schedule: check.default_schedule,
+					enabled: overrides[ check.id ]?.enabled ?? true,
+					interval: overrides[ check.id ]?.interval ?? '',
+				} ) )
+				.sort(
+					( a, b ) =>
+						a.group_label.localeCompare( b.group_label ) ||
+						a.label.localeCompare( b.label )
+				),
 		[ checksResource.data, overrides ]
 	);
 
 	const checkFields = useMemo(
 		() => [
-			textField( 'label', __( 'Check', 'rtcamp-amc-copilot' ) ),
+			textField( 'label', __( 'Check', 'rtcamp-amc-copilot' ), {
+				render: ( { item } ) => (
+					<>
+						<strong>{ item.label }</strong>
+						<br />
+						<code>{ item.id }</code>
+					</>
+				),
+			} ),
 			textField( 'id', __( 'ID', 'rtcamp-amc-copilot' ) ),
-			enumField(
-				'group_label',
-				__( 'Group', 'rtcamp-amc-copilot' ),
-				toElements( [
-					...new Set(
-						( checksResource.data ?? [] ).map(
-							( c ) => c.group_label
-						)
-					),
-				] ),
-				{ filterBy: { operators: [ 'isAny' ], isPrimary: true } }
-			),
+			textField( 'group_label', __( 'Group', 'rtcamp-amc-copilot' ) ),
 			customField(
 				'enabled',
 				__( 'Enabled', 'rtcamp-amc-copilot' ),
-				( item ) => ( item.enabled ? 'on' : 'off' ),
+				( item ) =>
+					item.enabled
+						? __( 'On', 'rtcamp-amc-copilot' )
+						: __( 'Off', 'rtcamp-amc-copilot' ),
 				( item ) => (
-					<ToggleControl
-						__nextHasNoMarginBottom
-						// The visible text ("On"/"Off") stays in the accessible
-						// name; the check name is added for screen readers only.
-						label={
-							<>
-								<span className="screen-reader-text">
-									{ sprintf(
-										/* translators: %s: check name. */
-										__(
-											'Enable %s:',
-											'rtcamp-amc-copilot'
-										),
-										item.label
-									) }{ ' ' }
-								</span>
-								{ item.enabled
-									? __( 'On', 'rtcamp-amc-copilot' )
-									: __( 'Off', 'rtcamp-amc-copilot' ) }
-							</>
-						}
-						checked={ item.enabled }
-						onChange={ ( enabled ) =>
-							patchCheck( item.id, { enabled } )
-						}
-					/>
-				),
-				{
-					elements: [
-						{
-							value: 'on',
-							label: __( 'On', 'rtcamp-amc-copilot' ),
-						},
-						{
-							value: 'off',
-							label: __( 'Off', 'rtcamp-amc-copilot' ),
-						},
-					],
-					filterBy: { operators: [ 'isAny' ] },
-				}
+					<label htmlFor={ `amc-check-enabled-${ item.id }` }>
+						<input
+							id={ `amc-check-enabled-${ item.id }` }
+							type="checkbox"
+							checked={ item.enabled }
+							onChange={ ( event ) =>
+								patchCheck( item.id, {
+									enabled: event.target.checked,
+								} )
+							}
+						/>{ ' ' }
+						{ __( 'Enabled', 'rtcamp-amc-copilot' ) }
+						<span className="screen-reader-text">
+							{ `: ${ item.label }` }
+						</span>
+					</label>
+				)
 			),
 			customField(
 				'interval',
@@ -469,38 +632,39 @@ export default function Settings() {
 					'event' === item.default_schedule ? (
 						<span>{ intervalLabel( 'event' ) }</span>
 					) : (
-						<SelectControl
-							__nextHasNoMarginBottom
-							__next40pxDefaultSize
-							hideLabelFromVision
-							label={ sprintf(
+						<select
+							aria-label={ sprintf(
 								/* translators: %s: check name. */
 								__( 'Interval for %s', 'rtcamp-amc-copilot' ),
 								item.label
 							) }
 							value={ item.interval }
-							options={ [
-								{
-									value: '',
-									label: sprintf(
-										/* translators: %s: default interval, e.g. Daily. */
-										__(
-											'Default (%s)',
-											'rtcamp-amc-copilot'
-										),
-										intervalLabel( item.default_schedule )
-									),
-								},
-								...getIntervals(),
-							] }
-							onChange={ ( interval ) =>
-								patchCheck( item.id, { interval } )
+							onChange={ ( event ) =>
+								patchCheck( item.id, {
+									interval: event.target.value,
+								} )
 							}
-						/>
+						>
+							<option value="">
+								{ sprintf(
+									/* translators: %s: default interval, e.g. Daily. */
+									__( 'Default (%s)', 'rtcamp-amc-copilot' ),
+									intervalLabel( item.default_schedule )
+								) }
+							</option>
+							{ getIntervals().map( ( option ) => (
+								<option
+									key={ option.value }
+									value={ option.value }
+								>
+									{ option.label }
+								</option>
+							) ) }
+						</select>
 					)
 			),
 		],
-		[ checksResource.data, patchCheck ]
+		[ patchCheck ]
 	);
 
 	const save = async () => {
@@ -522,7 +686,7 @@ export default function Settings() {
 			);
 			setErrors( { recipients: message } );
 			notice.error( message );
-			recipientsRef.current?.focus();
+			focusField( recipientsRef );
 			return;
 		}
 		if ( ! /^\d{2}:\d{2}$/.test( form.digest_time ) ) {
@@ -532,7 +696,7 @@ export default function Settings() {
 			);
 			setErrors( { digest_time: message } );
 			notice.error( message );
-			digestTimeRef.current?.focus();
+			focusField( digestTimeRef );
 			return;
 		}
 		setErrors( {} );
@@ -584,22 +748,402 @@ export default function Settings() {
 		}
 	};
 
+	const saveButton = (
+		<p className="submit">
+			<Button
+				variant="primary"
+				onClick={ save }
+				isBusy={ saving }
+				disabled={ ! form || saving }
+				accessibleWhenDisabled
+			>
+				{ saving
+					? __( 'Saving…', 'rtcamp-amc-copilot' )
+					: __( 'Save settings', 'rtcamp-amc-copilot' ) }
+			</Button>
+		</p>
+	);
+
+	const general = () => (
+		<>
+			<h3>{ __( 'Site', 'rtcamp-amc-copilot' ) }</h3>
+			<table className="form-table" role="presentation">
+				<tbody>
+					<Row
+						id="amc-setting-site-type"
+						label={ __( 'Site type', 'rtcamp-amc-copilot' ) }
+						help={ __(
+							'Decides whether the latest post or the latest product is a default smoke URL.',
+							'rtcamp-amc-copilot'
+						) }
+					>
+						<select
+							id="amc-setting-site-type"
+							value={ form.site_type }
+							aria-describedby="amc-setting-site-type-description"
+							onChange={ ( event ) =>
+								set( 'site_type' )( event.target.value )
+							}
+						>
+							<option value="content">
+								{ __(
+									'Content site (latest post)',
+									'rtcamp-amc-copilot'
+								) }
+							</option>
+							<option value="ecommerce">
+								{ __(
+									'Shop (latest product)',
+									'rtcamp-amc-copilot'
+								) }
+							</option>
+						</select>
+					</Row>
+					<Row
+						id="amc-setting-environment"
+						label={ __(
+							'Environment label for reports',
+							'rtcamp-amc-copilot'
+						) }
+					>
+						<select
+							id="amc-setting-environment"
+							value={ form.environment }
+							onChange={ ( event ) =>
+								set( 'environment' )( event.target.value )
+							}
+						>
+							{ environmentOptions().map( ( option ) => (
+								<option
+									key={ option.value }
+									value={ option.value }
+								>
+									{ option.label }
+								</option>
+							) ) }
+						</select>
+					</Row>
+					<Row
+						id="amc-setting-contract-start"
+						label={ __(
+							'Contract start date',
+							'rtcamp-amc-copilot'
+						) }
+						help={ __(
+							'Quarterly and annual reports follow this date; the calendar is used when empty.',
+							'rtcamp-amc-copilot'
+						) }
+					>
+						<input
+							id="amc-setting-contract-start"
+							type="date"
+							value={ form.contract_start ?? '' }
+							aria-describedby="amc-setting-contract-start-description"
+							onChange={ ( event ) =>
+								set( 'contract_start' )( event.target.value )
+							}
+						/>
+					</Row>
+				</tbody>
+			</table>
+
+			<h3>{ __( 'Notifications', 'rtcamp-amc-copilot' ) }</h3>
+			<table className="form-table" role="presentation">
+				<tbody>
+					<Row
+						id="amc-setting-recipients"
+						label={ __( 'Recipients', 'rtcamp-amc-copilot' ) }
+						help={ __(
+							'One email address per line. Leave empty to email every engineer.',
+							'rtcamp-amc-copilot'
+						) }
+						error={ errors.recipients }
+					>
+						<textarea
+							id="amc-setting-recipients"
+							className="large-text code"
+							rows={ 4 }
+							value={ recipientsText }
+							ref={ recipientsRef }
+							aria-invalid={ !! errors.recipients }
+							aria-describedby="amc-setting-recipients-description"
+							onChange={ ( event ) => {
+								setErrors( ( current ) => ( {
+									...current,
+									recipients: undefined,
+								} ) );
+								setRecipientsText( event.target.value );
+							} }
+						/>
+					</Row>
+					<Row
+						id="amc-setting-digest-time"
+						label={ __(
+							'Daily digest time',
+							'rtcamp-amc-copilot'
+						) }
+						help={ __( 'In site time.', 'rtcamp-amc-copilot' ) }
+						error={ errors.digest_time }
+					>
+						<input
+							id="amc-setting-digest-time"
+							type="time"
+							value={ form.digest_time }
+							ref={ digestTimeRef }
+							aria-invalid={ !! errors.digest_time }
+							aria-describedby="amc-setting-digest-time-description"
+							onChange={ ( event ) =>
+								set( 'digest_time' )( event.target.value )
+							}
+						/>
+					</Row>
+					<Row
+						id="amc-setting-alerts-per-hour"
+						label={ __(
+							'Immediate alerts per hour',
+							'rtcamp-amc-copilot'
+						) }
+						help={ __(
+							'Alerts over this limit go into the next digest.',
+							'rtcamp-amc-copilot'
+						) }
+					>
+						<input
+							id="amc-setting-alerts-per-hour"
+							type="number"
+							className="small-text"
+							min={ 0 }
+							max={ 100 }
+							value={ form.immediate_alerts_per_hour }
+							aria-describedby="amc-setting-alerts-per-hour-description"
+							onChange={ ( event ) =>
+								set( 'immediate_alerts_per_hour' )(
+									event.target.value
+								)
+							}
+						/>
+					</Row>
+					<CheckboxRow
+						id="amc-setting-notify-client"
+						title={ __( 'Client emails', 'rtcamp-amc-copilot' ) }
+						label={ __(
+							'Email client administrators when a report is published',
+							'rtcamp-amc-copilot'
+						) }
+						checked={ !! form.notify_client_on_publish }
+						onChange={ set( 'notify_client_on_publish' ) }
+					/>
+				</tbody>
+			</table>
+
+			<h3>{ __( 'Smoke check credentials', 'rtcamp-amc-copilot' ) }</h3>
+			<p>
+				{ __(
+					'Optional basic-auth credentials for sites behind HTTP authentication.',
+					'rtcamp-amc-copilot'
+				) }
+			</p>
+			{ ! form.loopback_auth.encryption_available && (
+				<div className="notice notice-warning inline">
+					<p>
+						{ __(
+							'A password cannot be stored until AMC_COPILOT_ENCRYPTION_KEY is defined in wp-config.php.',
+							'rtcamp-amc-copilot'
+						) }
+					</p>
+				</div>
+			) }
+			<table className="form-table" role="presentation">
+				<tbody>
+					<Row
+						id="amc-setting-loopback-username"
+						label={ __( 'Username', 'rtcamp-amc-copilot' ) }
+					>
+						<input
+							id="amc-setting-loopback-username"
+							type="text"
+							className="regular-text"
+							autoComplete="off"
+							value={ form.loopback_auth.username }
+							onChange={ ( event ) =>
+								setNested(
+									'loopback_auth',
+									'username'
+								)( event.target.value )
+							}
+						/>
+					</Row>
+					<Row
+						id="amc-setting-loopback-password"
+						label={ __( 'Password', 'rtcamp-amc-copilot' ) }
+						help={
+							form.loopback_auth.has_password
+								? __(
+										'A password is stored. Leave empty to keep it.',
+										'rtcamp-amc-copilot'
+									)
+								: __(
+										'Write-only: it is stored encrypted and never shown.',
+										'rtcamp-amc-copilot'
+									)
+						}
+					>
+						<input
+							id="amc-setting-loopback-password"
+							type="password"
+							className="regular-text"
+							autoComplete="new-password"
+							value={ password }
+							disabled={
+								! form.loopback_auth.encryption_available
+							}
+							aria-describedby="amc-setting-loopback-password-description"
+							onChange={ ( event ) =>
+								setPassword( event.target.value )
+							}
+						/>
+					</Row>
+				</tbody>
+			</table>
+
+			<h3>{ __( 'Data and kill switch', 'rtcamp-amc-copilot' ) }</h3>
+			<table className="form-table" role="presentation">
+				<tbody>
+					<Row
+						id="amc-setting-retention"
+						label={ __(
+							'Keep check history for',
+							'rtcamp-amc-copilot'
+						) }
+						help={ __(
+							'Sampled slow queries are always kept for 90 days.',
+							'rtcamp-amc-copilot'
+						) }
+					>
+						<input
+							id="amc-setting-retention"
+							type="number"
+							className="small-text"
+							min={ 1 }
+							max={ 60 }
+							value={ form.retention_months }
+							aria-describedby="amc-setting-retention-description"
+							onChange={ ( event ) =>
+								set( 'retention_months' )( event.target.value )
+							}
+						/>{ ' ' }
+						{ __( 'months', 'rtcamp-amc-copilot' ) }
+					</Row>
+					<CheckboxRow
+						id="amc-setting-kill-switch"
+						title={ __( 'Kill switch', 'rtcamp-amc-copilot' ) }
+						label={ __(
+							'Stop all capture and scheduled checks',
+							'rtcamp-amc-copilot'
+						) }
+						help={
+							form.kill_switch_locked
+								? __(
+										'AMC_COPILOT_DISABLED is defined in wp-config.php and always wins. It cannot be changed here.',
+										'rtcamp-amc-copilot'
+									)
+								: __(
+										'The AMC_COPILOT_DISABLED constant always overrides this setting.',
+										'rtcamp-amc-copilot'
+									)
+						}
+						checked={
+							!! ( form.kill_switch_locked || form.kill_switch )
+						}
+						disabled={ form.kill_switch_locked }
+						onChange={ set( 'kill_switch' ) }
+					/>
+				</tbody>
+			</table>
+
+			<h3>{ __( 'Report disclaimers', 'rtcamp-amc-copilot' ) }</h3>
+			<p>
+				{ __(
+					'Leave a field empty to use the report block’s built-in text.',
+					'rtcamp-amc-copilot'
+				) }
+			</p>
+			<table className="form-table" role="presentation">
+				<tbody>
+					{ [
+						[ 'backups', __( 'Backups', 'rtcamp-amc-copilot' ) ],
+						[ 'hosting', __( 'Hosting', 'rtcamp-amc-copilot' ) ],
+						[ 'domains', __( 'Domains', 'rtcamp-amc-copilot' ) ],
+						[
+							'accessibility',
+							__( 'Accessibility', 'rtcamp-amc-copilot' ),
+						],
+					].map( ( [ key, label ] ) => (
+						<Row
+							key={ key }
+							id={ `amc-setting-disclaimer-${ key }` }
+							label={ label }
+						>
+							<textarea
+								id={ `amc-setting-disclaimer-${ key }` }
+								className="large-text"
+								rows={ 3 }
+								value={ form.disclaimers[ key ] ?? '' }
+								onChange={ ( event ) =>
+									setNested(
+										'disclaimers',
+										key
+									)( event.target.value )
+								}
+							/>
+						</Row>
+					) ) }
+				</tbody>
+			</table>
+			{ saveButton }
+		</>
+	);
+
+	const schedule = () => (
+		<>
+			<p className="description">
+				{ __(
+					'Turn checks off or change how often they run. Event checks run when something happens on the site.',
+					'rtcamp-amc-copilot'
+				) }
+			</p>
+			{ checksResource.error && (
+				<ErrorNotice error={ checksResource.error } />
+			) }
+			{ ! checksResource.data && ! checksResource.error && <Loading /> }
+			{ checksResource.data && (
+				<SimpleTable
+					data={ checkRows }
+					fields={ checkFields }
+					columns={ [
+						'label',
+						'group_label',
+						'enabled',
+						'interval',
+					] }
+					exportName="amc-settings-checks"
+					label={ __( 'Check schedule', 'rtcamp-amc-copilot' ) }
+				/>
+			) }
+			{ saveButton }
+		</>
+	);
+
+	const panels = {
+		general,
+		schedule,
+		access: () => <Engineers />,
+		fields: () => <SavedFieldsEditor />,
+	};
+
 	return (
 		<ScreenState
-			title={ __( 'Settings', 'rtcamp-amc-copilot' ) }
-			actions={
-				<Button
-					variant="primary"
-					onClick={ save }
-					isBusy={ saving }
-					disabled={ ! form || saving }
-					accessibleWhenDisabled
-				>
-					{ saving
-						? __( 'Saving…', 'rtcamp-amc-copilot' )
-						: __( 'Save settings', 'rtcamp-amc-copilot' ) }
-				</Button>
-			}
+			screen="settings"
 			isLoading={ isLoading }
 			error={ error }
 			onRetry={ reload }
@@ -607,323 +1151,20 @@ export default function Settings() {
 		>
 			{ notice.node }
 			{ form && (
-				<Panel>
-					<PanelBody
-						title={ __( 'Site', 'rtcamp-amc-copilot' ) }
-						initialOpen
-					>
-						<SelectControl
-							__nextHasNoMarginBottom
-							__next40pxDefaultSize
-							label={ __( 'Site type', 'rtcamp-amc-copilot' ) }
-							help={ __(
-								'Decides whether the latest post or the latest product is a default smoke URL.',
-								'rtcamp-amc-copilot'
-							) }
-							value={ form.site_type }
-							options={ [
-								{
-									value: 'content',
-									label: __(
-										'Content site (latest post)',
-										'rtcamp-amc-copilot'
-									),
-								},
-								{
-									value: 'ecommerce',
-									label: __(
-										'Shop (latest product)',
-										'rtcamp-amc-copilot'
-									),
-								},
-							] }
-							onChange={ set( 'site_type' ) }
-						/>
-						<SelectControl
-							__nextHasNoMarginBottom
-							__next40pxDefaultSize
-							label={ __(
-								'Environment label for reports',
-								'rtcamp-amc-copilot'
-							) }
-							value={ form.environment }
-							options={ environmentOptions() }
-							onChange={ set( 'environment' ) }
-						/>
-						<TextControl
-							__nextHasNoMarginBottom
-							__next40pxDefaultSize
-							type="date"
-							label={ __(
-								'Contract start date',
-								'rtcamp-amc-copilot'
-							) }
-							help={ __(
-								'Quarterly and annual reports follow this date; the calendar is used when empty.',
-								'rtcamp-amc-copilot'
-							) }
-							value={ form.contract_start }
-							onChange={ set( 'contract_start' ) }
-						/>
-					</PanelBody>
-
-					<PanelBody
-						title={ __( 'Notifications', 'rtcamp-amc-copilot' ) }
-						initialOpen={ false }
-					>
-						<TextareaControl
-							__nextHasNoMarginBottom
-							label={ __( 'Recipients', 'rtcamp-amc-copilot' ) }
-							help={ withError(
-								errors.recipients,
-								__(
-									'One email address per line. Leave empty to email every engineer.',
-									'rtcamp-amc-copilot'
-								)
-							) }
-							rows={ 4 }
-							value={ recipientsText }
-							onChange={ ( value ) => {
-								setErrors( ( current ) => ( {
-									...current,
-									recipients: undefined,
-								} ) );
-								setRecipientsText( value );
-							} }
-							ref={ recipientsRef }
-							aria-invalid={ !! errors.recipients }
-						/>
-						<TextControl
-							__nextHasNoMarginBottom
-							__next40pxDefaultSize
-							type="time"
-							label={ __(
-								'Daily digest time (site time)',
-								'rtcamp-amc-copilot'
-							) }
-							help={ withError( errors.digest_time ) }
-							value={ form.digest_time }
-							onChange={ set( 'digest_time' ) }
-							ref={ digestTimeRef }
-							aria-invalid={ !! errors.digest_time }
-						/>
-						<TextControl
-							__nextHasNoMarginBottom
-							__next40pxDefaultSize
-							type="number"
-							min={ 0 }
-							max={ 100 }
-							label={ __(
-								'Immediate alerts per hour',
-								'rtcamp-amc-copilot'
-							) }
-							help={ __(
-								'Alerts over this limit go into the next digest.',
-								'rtcamp-amc-copilot'
-							) }
-							value={ form.immediate_alerts_per_hour }
-							onChange={ set( 'immediate_alerts_per_hour' ) }
-						/>
-						<ToggleControl
-							__nextHasNoMarginBottom
-							label={ __(
-								'Email client administrators when a report is published',
-								'rtcamp-amc-copilot'
-							) }
-							checked={ form.notify_client_on_publish }
-							onChange={ set( 'notify_client_on_publish' ) }
-						/>
-					</PanelBody>
-
-					<PanelBody
-						title={ __(
-							'Smoke check credentials',
-							'rtcamp-amc-copilot'
-						) }
-						initialOpen={ false }
-					>
-						<p className="description">
-							{ __(
-								'Optional basic-auth credentials for sites behind HTTP authentication.',
-								'rtcamp-amc-copilot'
-							) }
-						</p>
-						{ ! form.loopback_auth.encryption_available && (
-							<Notice status="warning" isDismissible={ false }>
-								{ __(
-									'A password cannot be stored until AMC_COPILOT_ENCRYPTION_KEY is defined in wp-config.php.',
-									'rtcamp-amc-copilot'
-								) }
-							</Notice>
-						) }
-						<TextControl
-							__nextHasNoMarginBottom
-							__next40pxDefaultSize
-							label={ __( 'Username', 'rtcamp-amc-copilot' ) }
-							value={ form.loopback_auth.username }
-							onChange={ setNested(
-								'loopback_auth',
-								'username'
-							) }
-							autoComplete="off"
-						/>
-						<TextControl
-							__nextHasNoMarginBottom
-							__next40pxDefaultSize
-							type="password"
-							label={ __( 'Password', 'rtcamp-amc-copilot' ) }
-							help={
-								form.loopback_auth.has_password
-									? __(
-											'A password is stored. Leave empty to keep it.',
-											'rtcamp-amc-copilot'
-										)
-									: __(
-											'Write-only: it is stored encrypted and never shown.',
-											'rtcamp-amc-copilot'
-										)
-							}
-							value={ password }
-							onChange={ setPassword }
-							disabled={
-								! form.loopback_auth.encryption_available
-							}
-							autoComplete="new-password"
-						/>
-					</PanelBody>
-
-					<PanelBody
-						title={ __( 'Check schedule', 'rtcamp-amc-copilot' ) }
-						initialOpen={ false }
-					>
-						{ checksResource.error && (
-							<ErrorNotice error={ checksResource.error } />
-						) }
-						{ checksResource.data && (
-							<DataTable
-								data={ checkRows }
-								fields={ checkFields }
-								exportName="amc-settings-checks"
-								label={ __(
-									'Check schedule',
-									'rtcamp-amc-copilot'
-								) }
-								initialView={ { perPage: 10 } }
-							/>
-						) }
-					</PanelBody>
-
-					<PanelBody
-						title={ __(
-							'Engineers with access',
-							'rtcamp-amc-copilot'
-						) }
-						initialOpen={ false }
-					>
-						<Engineers />
-					</PanelBody>
-
-					<PanelBody
-						title={ __(
-							'Saved report fields',
-							'rtcamp-amc-copilot'
-						) }
-						initialOpen={ false }
-					>
-						<SavedFieldsEditor />
-					</PanelBody>
-
-					<PanelBody
-						title={ __(
-							'Report disclaimers',
-							'rtcamp-amc-copilot'
-						) }
-						initialOpen={ false }
-					>
-						<p className="description">
-							{ __(
-								'Leave a field empty to use the report block’s built-in text.',
-								'rtcamp-amc-copilot'
-							) }
-						</p>
-						{ [
-							[
-								'backups',
-								__( 'Backups', 'rtcamp-amc-copilot' ),
-							],
-							[
-								'hosting',
-								__( 'Hosting', 'rtcamp-amc-copilot' ),
-							],
-							[
-								'domains',
-								__( 'Domains', 'rtcamp-amc-copilot' ),
-							],
-							[
-								'accessibility',
-								__( 'Accessibility', 'rtcamp-amc-copilot' ),
-							],
-						].map( ( [ key, label ] ) => (
-							<TextareaControl
-								key={ key }
-								__nextHasNoMarginBottom
-								label={ label }
-								rows={ 3 }
-								value={ form.disclaimers[ key ] }
-								onChange={ setNested( 'disclaimers', key ) }
-							/>
-						) ) }
-					</PanelBody>
-
-					<PanelBody
-						title={ __(
-							'Retention and kill switch',
-							'rtcamp-amc-copilot'
-						) }
-						initialOpen={ false }
-					>
-						<TextControl
-							__nextHasNoMarginBottom
-							__next40pxDefaultSize
-							type="number"
-							min={ 1 }
-							max={ 60 }
-							label={ __(
-								'Keep check history for (months)',
-								'rtcamp-amc-copilot'
-							) }
-							help={ __(
-								'Sampled slow queries are always kept for 90 days.',
-								'rtcamp-amc-copilot'
-							) }
-							value={ form.retention_months }
-							onChange={ set( 'retention_months' ) }
-						/>
-						<ToggleControl
-							__nextHasNoMarginBottom
-							label={ __(
-								'Kill switch: stop all capture and cron jobs',
-								'rtcamp-amc-copilot'
-							) }
-							help={
-								form.kill_switch_locked
-									? __(
-											'AMC_COPILOT_DISABLED is defined in wp-config.php and always wins. It cannot be changed here.',
-											'rtcamp-amc-copilot'
-										)
-									: __(
-											'The AMC_COPILOT_DISABLED constant always overrides this setting.',
-											'rtcamp-amc-copilot'
-										)
-							}
-							checked={
-								form.kill_switch_locked || form.kill_switch
-							}
-							disabled={ form.kill_switch_locked }
-							onChange={ set( 'kill_switch' ) }
-						/>
-					</PanelBody>
-				</Panel>
+				<TabPanel
+					key={ tabsKey }
+					className="amc-tabs"
+					tabs={ TABS() }
+					initialTabName={ tab }
+					onSelect={ setTab }
+					ref={ tabsRef }
+				>
+					{ ( current ) => (
+						<div className="amc-tab-content">
+							{ panels[ current.name ]() }
+						</div>
+					) }
+				</TabPanel>
 			) }
 		</ScreenState>
 	);

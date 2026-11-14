@@ -21,6 +21,7 @@ import {
 	publishReport,
 } from '../api';
 import DataTable from '../components/DataTable';
+import Postbox from '../components/Postbox';
 import ScreenState, { ErrorNotice } from '../components/ScreenState';
 import StatusBadge from '../components/StatusBadge';
 import useNotice from '../hooks/useNotice';
@@ -347,7 +348,7 @@ export default function Reports() {
 
 	return (
 		<ScreenState
-			title={ __( 'Reports', 'rtcamp-amc-copilot' ) }
+			screen="reports"
 			actions={
 				<Button
 					variant="primary"
@@ -370,36 +371,44 @@ export default function Reports() {
 						fields={ fields }
 						actions={ actions }
 						exportName="amc-reports"
+						variant="full"
 						label={ __( 'Report list', 'rtcamp-amc-copilot' ) }
 					/>
-					<h3>{ __( 'Saved fields', 'rtcamp-amc-copilot' ) }</h3>
-					<p className="description">
-						{ __(
-							'Stable facts carried forward from the latest published report.',
-							'rtcamp-amc-copilot'
-						) }{ ' ' }
-						<a
-							href={ screenUrl( 'settings' ) }
-							onClick={ ( event ) => {
-								event.preventDefault();
-								navigate( 'settings' );
-							} }
-						>
+					<Postbox
+						title={ __( 'Saved fields', 'rtcamp-amc-copilot' ) }
+					>
+						<p className="description">
 							{ __(
-								'Edit them in Settings.',
+								'Stable facts carried forward from the latest published report.',
 								'rtcamp-amc-copilot'
-							) }
-						</a>
-					</p>
-					{ saved.error && <ErrorNotice error={ saved.error } /> }
-					{ saved.data && (
-						<DataTable
-							data={ savedRows }
-							fields={ savedFields }
-							exportName="amc-saved-fields"
-							label={ __( 'Saved fields', 'rtcamp-amc-copilot' ) }
-						/>
-					) }
+							) }{ ' ' }
+							<a
+								href={ screenUrl( 'settings' ) }
+								onClick={ ( event ) => {
+									event.preventDefault();
+									navigate( 'settings' );
+								} }
+							>
+								{ __(
+									'Edit them in Settings.',
+									'rtcamp-amc-copilot'
+								) }
+							</a>
+						</p>
+						{ saved.error && <ErrorNotice error={ saved.error } /> }
+						{ saved.data && (
+							<DataTable
+								data={ savedRows }
+								fields={ savedFields }
+								exportName="amc-saved-fields"
+								label={ __(
+									'Saved fields',
+									'rtcamp-amc-copilot'
+								) }
+								variant="compact"
+							/>
+						) }
+					</Postbox>
 				</>
 			) }
 			{ generating && (
