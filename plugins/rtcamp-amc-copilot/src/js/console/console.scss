@@ -236,3 +236,110 @@
 		margin-top: 6px;
 	}
 }
+
+/*
+ * DataViews lists, made to read like a core list table (edit.php, users.php):
+ * the table carries `widefat striped` (set in DataTable), so borders, the
+ * white background and striped rows come from core list-tables.css. These
+ * rules only undo the DataViews look that fights it: uppercase 11px
+ * headings, cells that never wrap (which pushed Started, Duration and
+ * Actions off-screen behind a sticky column) and the grey pressed toggle.
+ */
+/* stylelint-disable selector-class-pattern -- DataViews' own BEM class names. */
+.amc-datatable {
+
+	.dataviews-wrapper {
+		background: transparent;
+	}
+
+	.dataviews__view-actions,
+	.dataviews-filters__container {
+		padding-inline: 0;
+	}
+
+	.dataviews-layout__container {
+		overflow-x: auto;
+	}
+
+	.dataviews-view-table.widefat {
+		color: inherit;
+
+		th,
+		td {
+			padding: 8px 10px;
+		}
+
+		thead th,
+		.dataviews-view-table-header-button {
+			font-size: 14px;
+			font-weight: 400;
+			line-height: 1.4;
+			text-transform: none;
+		}
+
+		thead th:has(.dataviews-view-table-header-button):first-child {
+			padding-inline-start: 6px;
+		}
+
+		// Text wraps like a core list table, and columns take the width
+		// they need (DataViews gives every cell a 15ch minimum).
+		tbody .dataviews-view-table__cell-content-wrapper {
+			min-height: 0;
+			min-width: 0;
+			white-space: normal;
+		}
+
+		tbody td {
+			vertical-align: middle;
+		}
+
+		.amc-nowrap {
+			white-space: nowrap;
+		}
+
+		.amc-cell-wrap {
+			min-width: 16em;
+			overflow-wrap: anywhere;
+		}
+
+		// The first column (an id or a name) starts at the left, as on core lists.
+		tr > :first-child .dataviews-view-table__cell-content-wrapper {
+			justify-content: flex-start;
+		}
+
+		// Row actions sit in the row, not in a sticky overlay.
+		.dataviews-view-table__actions-column--sticky {
+			position: static;
+			background: transparent;
+		}
+
+		.dataviews-view-table__actions-column--stuck::after {
+			display: none;
+		}
+	}
+
+	// When every filter is pinned the filter toggle is disabled and core
+	// paints it as a grey block; it does nothing then, so hide it (the pinned
+	// filter buttons below show what is active).
+	.dataviews-filters__container-visibility-toggle:has([aria-disabled="true"]) {
+		display: none;
+	}
+
+	.components-button.dataviews-filters__visibility-toggle.is-pressed:not([aria-disabled="true"]) {
+		background: transparent;
+		color: var(--wp-admin-theme-color);
+		box-shadow: inset 0 0 0 1px currentcolor;
+	}
+
+	// Pagination below the table, not a sticky bar over the last rows.
+	.dataviews-footer {
+		position: static;
+		padding-inline: 0;
+		background: transparent;
+	}
+
+	.dataviews-pagination {
+		padding-inline: 0;
+	}
+}
+/* stylelint-enable selector-class-pattern */
