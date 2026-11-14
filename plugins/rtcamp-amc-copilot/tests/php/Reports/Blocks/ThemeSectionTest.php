@@ -20,9 +20,15 @@ use AMC\Tests\TestCase;
  */
 final class ThemeSectionTest extends TestCase {
 
-	private function render_in_report( string $block_markup ): string {
+	/**
+	 * Render the block inside a report whose snapshot has this theme section.
+	 *
+	 * @param string               $block_markup Block markup.
+	 * @param array<string, mixed> $section      Theme section values.
+	 */
+	private function render_in_report( string $block_markup, array $section = [] ): string {
 		$snapshot                      = SnapshotSchema::empty_snapshot();
-		$snapshot['sections']['theme'] = [];
+		$snapshot['sections']['theme'] = $section;
 		$post_id                       = self::factory()->post->create(
 			[
 				'post_type'    => 'amc_report',
@@ -44,5 +50,28 @@ final class ThemeSectionTest extends TestCase {
 
 	public function test_hidden_section_renders_nothing(): void {
 		$this->assertSame( '', trim( $this->render_in_report( '<!-- wp:amc/section-theme {"hidden":true} /-->' ) ) );
+	}
+
+	public function test_themes_render_as_name_and_version_not_json(): void {
+		$html = $this->render_in_report(
+			'<!-- wp:amc/section-theme /-->',
+			[
+				'active_theme' => [
+					'name'    => 'Child Theme',
+					'slug'    => 'child',
+					'version' => '2.0',
+				],
+				'parent_theme' => [
+					'name'    => '',
+					'slug'    => 'twentytwentyfive',
+					'version' => '1.5',
+				],
+			]
+		);
+
+		$this->assertStringContainsString( 'Child Theme 2.0', $html );
+		$this->assertStringContainsString( 'twentytwentyfive 1.5', $html );
+		$this->assertStringNotContainsString( '&quot;slug&quot;', $html );
+		$this->assertStringNotContainsString( '{', $html );
 	}
 }

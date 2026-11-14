@@ -24,6 +24,13 @@ export function formatValue( value, type = 'string' ) {
 			? __( 'Yes', 'rtcamp-amc-copilot' )
 			: __( 'No', 'rtcamp-amc-copilot' );
 	}
+	if ( typeof value === 'object' && ! Array.isArray( value ) ) {
+		// A theme or plugin fact: "Name Version", like the PHP render.
+		const name = value.name || value.slug;
+		if ( name ) {
+			return `${ name } ${ value.version || '' }`.trim();
+		}
+	}
 	if ( typeof value === 'object' ) {
 		return JSON.stringify( value );
 	}
