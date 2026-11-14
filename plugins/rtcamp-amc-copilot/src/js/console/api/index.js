@@ -485,6 +485,54 @@ export const getRun = async ( id ) =>
 	).body;
 
 /**
+ * One run with what the Run detail page needs to debug it
+ * (`GET /runs/{id}?detail=1`): the user who started it, its schedule, queue
+ * wait, the older and newer runs of the same check, the previous result
+ * (with data, to compare) and the check's 10 newest runs.
+ *
+ * @param {number} id Run id.
+ * @return {Promise<Object>} Run with detail fields.
+ */
+export const getRunDetail = async ( id ) =>
+	(
+		await request( {
+			path: `/runs/${ id }`,
+			query: { detail: 1 },
+			mock: ( s ) => {
+				tickMockRuns( s );
+				const row = s.runs.find( ( r ) => r.id === id );
+				if ( ! row ) {
+					throw new ApiError( 'Run not found.', {
+						code: 'amc_not_found',
+						status: 404,
+					} );
+				}
+				const same = s.runs
+					.filter( ( r ) => r.check_id === row.check_id )
+					.sort( ( a, b ) => b.id - a.id );
+				const older = same.filter( ( r ) => r.id < id );
+				const newer = same.filter( ( r ) => r.id > id );
+				const previous = older.find( ( r ) =>
+					[ 'pass', 'warn', 'fail', 'info' ].includes( r.status )
+				);
+				return ok( {
+					...row,
+					findings: s.findings.filter( ( f ) => f.run_id === id ),
+					user: row.user_id
+						? { id: row.user_id, name: 'Sample engineer' }
+						: null,
+					schedule: null,
+					queue_ms: 0,
+					older_id: older[ 0 ]?.id ?? null,
+					newer_id: newer[ newer.length - 1 ]?.id ?? null,
+					previous: previous ?? null,
+					history: same.slice( 0, 10 ).map( withoutData ),
+				} );
+			},
+		} )
+	).body;
+
+/**
  * Poll one queued run: same route as {@link getRun}.
  *
  * @param {number} id Run id.
