@@ -41,7 +41,19 @@ An overridden field shows an **Edited** badge in the editor only.
 }
 ```
 
-Quarterly, annual and long custom (over 62 days) reports also carry two top-level keys, added by D1 (additive, no version bump): `totals` (`plugins_updated`, `plugins_added`, `plugins_removed`, `themes_updated`, `core_updates`, `users_added`, `users_removed`, `fatal`, `warning`, `deprecation`, `vulnerabilities_found`, `vulnerabilities_resolved`) and `monthly` (one entry per calendar month: `label`, `start`, `plugins_updated`, `plugins_added`, `plugins_removed`, `fatal`, `warning`, `deprecation`). Monthly reports have neither.
+Quarterly, annual and long custom (over 62 days) reports also carry two top-level keys, added by D1 (additive, no version bump): `totals` (`plugins_updated`, `plugins_added`, `plugins_removed`, `themes_updated`, `core_updates`, `users_added`, `users_removed`, `fatal`, `warning`, `deprecation`, `vulnerabilities_found`, `vulnerabilities_resolved`) and `monthly` (one entry per calendar month: `label`, `start`, `plugins_updated`, `plugins_added`, `plugins_removed`, `fatal`, `warning`, `deprecation`, plus the Performance figures below). Monthly reports have neither.
+
+### Monthly Performance figures
+
+Each `monthly` entry also holds the month's Performance figures, which the Performance block renders as a table (month, avg response, database size, autoload size) and an inline SVG bar chart:
+
+| Key | Type | Source |
+| --- | --- | --- |
+| `avg_response_ms` | int or `null` | Mean of the month's `perf.response` runs (`avg_ms`, or the mean of `urls[].response_ms`) |
+| `database_size_bytes` | int or `null` | The month's **last** `perf.database` run (`database_size_bytes` or `total_size_bytes`): a size is a level, not a sum |
+| `autoload_size_bytes` | int or `null` | Same run as `database_size_bytes` |
+
+A month with no matching run holds `null`, rendered as "No data", never zero. These keys are additive, so `schema_version` stays `1`. A quarterly or annual snapshot stored before they existed still renders: the block takes each month's average from the `response_trend` point with the same `start` and shows "No data" for the sizes. Monthly reports keep the weekly `response_trend` and have no `monthly` list, so they render as before.
 
 Rules:
 

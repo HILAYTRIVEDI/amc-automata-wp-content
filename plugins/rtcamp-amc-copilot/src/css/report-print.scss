@@ -9,6 +9,17 @@
 	}
 }
 
+.amc-trend-chart {
+	margin: 0 0 1em;
+	max-width: 40rem;
+
+	svg {
+		display: block;
+		width: 100%;
+		height: auto;
+	}
+}
+
 @media print {
 
 	.amc-report-logo {
@@ -54,6 +65,10 @@
 
 	.amc-section figure.wp-block-table tr {
 		break-inside: avoid;
+		break-inside: avoid;
+	}
+
+	.amc-trend-chart {
 		break-inside: avoid;
 	}
 

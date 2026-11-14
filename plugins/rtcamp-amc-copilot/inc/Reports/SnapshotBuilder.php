@@ -43,6 +43,11 @@ use DateTimeZone;
  * Quarterly, annual and long custom periods add a top-level `totals` object
  * (period totals) and `monthly` list (one entry per calendar month), and the
  * Performance trend uses monthly points. Monthly reports use weekly points.
+ * Each `monthly` entry also carries the month's Performance figures:
+ * `avg_response_ms` (mean of that month's perf.response runs) and
+ * `database_size_bytes` / `autoload_size_bytes` (from the month's LAST
+ * perf.database run, as a size is a level, not a sum). A month with no
+ * matching run holds null, never 0.
  *
  * Run data the builder reads (every key is optional; a missing one falls back
  * to a WordPress read, or null, which the schema allows). When a check lands
@@ -865,7 +870,9 @@ final class SnapshotBuilder {
 	 * @return list<array<string, mixed>>
 	 */
 	private function monthly( Period $period, array $changes ): array {
-		$monthly = [];
+		$monthly   = [];
+		$responses = $this->runs_in_period( 'perf.response', $period );
+		$databases = $this->runs_in_period( 'perf.database', $period );
 
 		foreach ( $this->buckets( $period, true ) as $bucket ) {
 			$since = $this->utc( $bucket['start'] );
@@ -873,6 +880,7 @@ final class SnapshotBuilder {
 			$in    = static fn ( array $row ): bool => (string) $row['created_at'] >= $since && (string) $row['created_at'] < $until;
 			$count = static fn ( array $rows, string $action ): int => count( array_filter( $rows, static fn ( array $row ): bool => $in( $row ) && $action === $row['action'] ) );
 			$types = $this->events->counts_by_type( $since, $until );
+			$perf  = $this->month_performance( $responses, $databases, $since, $until );
 
 			$monthly[] = [
 				'label'           => $bucket['label'],
@@ -883,10 +891,52 @@ final class SnapshotBuilder {
 				'fatal'           => $types['fatal'],
 				'warning'         => $types['warning'] + $types['notice'],
 				'deprecation'     => $types['deprecation'] + $types['doing_it_wrong'],
-			];
+			] + $perf;
 		}
 
 		return $monthly;
+	}
+
+	/**
+	 * Performance figures of one month, from runs already loaded.
+	 *
+	 * @param list<array<string, mixed>> $responses perf.response runs of the period.
+	 * @param list<array<string, mixed>> $databases perf.database runs of the period.
+	 * @param string                     $since     Month start, UTC 'Y-m-d H:i:s' (inclusive).
+	 * @param string                     $until     Month end, UTC 'Y-m-d H:i:s' (exclusive).
+	 *
+	 * @return array{avg_response_ms: int|null, database_size_bytes: int|null, autoload_size_bytes: int|null}
+	 */
+	private function month_performance( array $responses, array $databases, string $since, string $until ): array {
+		$in_month = static fn ( array $run ): bool => (string) $run['created_at'] >= $since && (string) $run['created_at'] < $until;
+
+		$sum = 0.0;
+		$n   = 0;
+
+		foreach ( array_filter( $responses, $in_month ) as $run ) {
+			$avg = self::run_avg_ms( (array) $run['data'] );
+
+			if ( null !== $avg ) {
+				$sum += $avg;
+				++$n;
+			}
+		}
+
+		$latest = [];
+
+		foreach ( array_filter( $databases, $in_month ) as $run ) {
+			if ( [] === $latest || (string) $run['created_at'] >= (string) $latest['created_at'] ) {
+				$latest = $run;
+			}
+		}
+
+		$data = [] === $latest ? [] : (array) $latest['data'];
+
+		return [
+			'avg_response_ms'     => $n > 0 ? (int) round( $sum / $n ) : null,
+			'database_size_bytes' => self::integer( self::pick( $data, [ 'database_size_bytes', 'total_size_bytes' ] ) ),
+			'autoload_size_bytes' => self::integer( self::pick( $data, [ 'autoload_size_bytes' ] ) ),
+		];
 	}
 
 	/**
