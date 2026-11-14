@@ -58,6 +58,11 @@ final class Settings implements Registrable {
 	public const DISCLAIMERS = [ 'backups', 'hosting', 'domains', 'accessibility' ];
 
 	/**
+	 * Most addresses `report_publish_recipients` may hold.
+	 */
+	public const MAX_REPORT_PUBLISH_RECIPIENTS = 25;
+
+	/**
 	 * {@inheritDoc}
 	 */
 	public function register_hooks(): void {
@@ -92,6 +97,7 @@ final class Settings implements Registrable {
 	 *   digest_time: string,
 	 *   immediate_alerts_per_hour: int,
 	 *   notify_client_on_publish: bool,
+	 *   report_publish_recipients: list<string>,
 	 *   smoke_urls: list<array{url: string, required_text: string}>,
 	 *   loopback_auth: array{username: string, password: string},
 	 *   kill_switch: bool,
@@ -116,6 +122,8 @@ final class Settings implements Registrable {
 			'immediate_alerts_per_hour' => 10,
 			// Email client administrators when a report is published.
 			'notify_client_on_publish'  => true,
+			// Extra addresses emailed when a report is first published (on top of client administrators).
+			'report_publish_recipients' => [],
 			// Extra smoke URLs. The smoke check always adds home, login and latest post/product.
 			'smoke_urls'                => [],
 			// Optional basic-auth credentials for loopback requests. Password stored encrypted.
@@ -259,6 +267,54 @@ final class Settings implements Registrable {
 	}
 
 	/**
+	 * Split a list of email addresses into valid and invalid entries.
+	 *
+	 * Accepts an array of strings or one string separated by new lines, commas
+	 * or semicolons. Valid addresses are sanitised with sanitize_email() and
+	 * deduplicated case-insensitively (the first spelling wins); empty entries
+	 * are ignored.
+	 *
+	 * @param mixed $value Raw value.
+	 *
+	 * @return array{valid: list<string>, invalid: list<string>}
+	 */
+	public static function parse_email_list( mixed $value ): array {
+		if ( is_string( $value ) ) {
+			$value = preg_split( '/[\r\n,;]+/', $value );
+		}
+
+		$valid   = [];
+		$invalid = [];
+
+		foreach ( is_array( $value ) ? $value : [] as $entry ) {
+			if ( ! is_scalar( $entry ) ) {
+				$invalid[] = (string) wp_json_encode( $entry );
+				continue;
+			}
+
+			$entry = trim( (string) $entry );
+
+			if ( '' === $entry ) {
+				continue;
+			}
+
+			$email = sanitize_email( $entry );
+
+			if ( $email !== $entry || ! is_email( $email ) ) {
+				$invalid[] = $entry;
+				continue;
+			}
+
+			$valid[ strtolower( $email ) ] ??= $email;
+		}
+
+		return [
+			'valid'   => array_values( $valid ),
+			'invalid' => array_values( array_unique( $invalid ) ),
+		];
+	}
+
+	/**
 	 * Whether a password can be stored: needs AMC_COPILOT_ENCRYPTION_KEY in
 	 * wp-config.php (the skeleton's Encryption deliberately has no salt fallback).
 	 */
@@ -327,6 +383,11 @@ final class Settings implements Registrable {
 
 		$clean['immediate_alerts_per_hour'] = max( 0, min( 100, absint( $settings['immediate_alerts_per_hour'] ?? $defaults['immediate_alerts_per_hour'] ) ) );
 		$clean['notify_client_on_publish']  = (bool) ( $settings['notify_client_on_publish'] ?? true );
+		$clean['report_publish_recipients'] = array_slice(
+			self::parse_email_list( $settings['report_publish_recipients'] ?? [] )['valid'],
+			0,
+			self::MAX_REPORT_PUBLISH_RECIPIENTS
+		);
 
 		$clean['smoke_urls'] = [];
 		foreach ( (array) ( $settings['smoke_urls'] ?? [] ) as $row ) {

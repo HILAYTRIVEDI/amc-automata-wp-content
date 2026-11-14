@@ -120,4 +120,33 @@ final class SettingsTest extends TestCase {
 
 		$this->assertTrue( KillSwitch::is_active() );
 	}
+
+	public function test_report_publish_recipients_default_to_an_empty_list(): void {
+		$this->assertSame( [], Settings::get_value( 'report_publish_recipients' ) );
+	}
+
+	public function test_report_publish_recipients_are_sanitised_deduplicated_and_capped(): void {
+		$saved = Settings::update(
+			[
+				'report_publish_recipients' => "pm@example.com\nnot-an-email, PM@Example.com;owner@example.org\n\n",
+			]
+		);
+
+		$this->assertSame( [ 'pm@example.com', 'owner@example.org' ], $saved['report_publish_recipients'], 'string input split, invalid dropped, case-insensitive dedupe' );
+
+		$many = [];
+		for ( $i = 0; $i < Settings::MAX_REPORT_PUBLISH_RECIPIENTS + 5; $i++ ) {
+			$many[] = "person{$i}@example.com";
+		}
+		$saved = Settings::update( [ 'report_publish_recipients' => $many ] );
+
+		$this->assertCount( Settings::MAX_REPORT_PUBLISH_RECIPIENTS, $saved['report_publish_recipients'] );
+	}
+
+	public function test_parse_email_list_reports_invalid_entries(): void {
+		$parsed = Settings::parse_email_list( [ ' a@example.com ', 'b@', 'c d@example.com', '', 42, 'a@example.com' ] );
+
+		$this->assertSame( [ 'a@example.com' ], $parsed['valid'] );
+		$this->assertSame( [ 'b@', 'c d@example.com', '42' ], $parsed['invalid'] );
+	}
 }
