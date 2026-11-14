@@ -184,7 +184,9 @@ export default function Runs() {
 			} ),
 			textField( 'check_label', __( 'Check', 'rtcamp-amc-copilot' ) ),
 			textField( 'check_id', __( 'Check ID', 'rtcamp-amc-copilot' ) ),
-			textField( 'group', __( 'Group', 'rtcamp-amc-copilot' ) ),
+			textField( 'group', __( 'Group', 'rtcamp-amc-copilot' ), {
+				getValue: ( { item } ) => item.group_label ?? item.group ?? '',
+			} ),
 			enumField(
 				'trigger',
 				__( 'Trigger', 'rtcamp-amc-copilot' ),
@@ -204,7 +206,11 @@ export default function Runs() {
 					),
 				}
 			),
-			textField( 'summary', __( 'Summary', 'rtcamp-amc-copilot' ) ),
+			textField( 'summary', __( 'Summary', 'rtcamp-amc-copilot' ), {
+				render: ( { item } ) => (
+					<span className="amc-cell-wrap">{ item.summary }</span>
+				),
+			} ),
 			dateField( 'created_at', __( 'Started', 'rtcamp-amc-copilot' ) ),
 			numberField(
 				'duration_ms',
