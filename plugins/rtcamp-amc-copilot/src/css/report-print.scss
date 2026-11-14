@@ -11,11 +11,20 @@
 
 @media print {
 
+	.amc-report-logo {
+		display: block;
+		break-after: avoid;
+		margin-bottom: 4mm;
+	}
+
 	.amc-report-page {
 
 		#wpadminbar,
 		#adminmenumain,
 		#wpfooter,
+		#screen-meta-links,
+		.page-title-action,
+		.notice,
 		.amc-no-print {
 			display: none !important;
 		}
