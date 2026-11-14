@@ -14,6 +14,7 @@ use AMC\Checks\Context;
 use AMC\Checks\Group;
 use AMC\Checks\Result;
 use AMC\Checks\Schedule;
+use AMC\Support\AdminFunctions;
 use AMC\Support\PluginDetect;
 
 /**
@@ -63,7 +64,7 @@ final class MailerDetect implements Check {
 	 * @param callable|null $hooks_source   Test seam; default count of callbacks on phpmailer_init.
 	 */
 	public function __construct( ?callable $plugins_source = null, ?callable $active_source = null, ?callable $hooks_source = null ) {
-		$this->plugins_source = $plugins_source ?? static fn (): array => function_exists( 'get_plugins' ) ? get_plugins() : [];
+		$this->plugins_source = $plugins_source ?? static fn (): array => AdminFunctions::ensure( 'get_plugins' ) ? get_plugins() : [];
 		$this->active_source  = $active_source ?? static fn (): array => (array) get_option( 'active_plugins', [] );
 		$this->hooks_source   = $hooks_source ?? static function (): int {
 			global $wp_filter;
