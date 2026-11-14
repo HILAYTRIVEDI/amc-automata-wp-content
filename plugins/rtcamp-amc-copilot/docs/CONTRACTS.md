@@ -330,6 +330,9 @@ Anonymous requests get 401; logged-in users without the capability get 403.
 | GET | `/reports/{id}/snapshot` | R | D1 | Live | – | `{ id, taken_at, snapshot }` (drafts: engineers only; engineers also get `saved_fields: { previous, changes }`) |
 | GET | `/saved-fields` | E | D1 | Live | – | `{ fields: { section: { field: string\|null } }, schema: { section: string[] } }` |
 | POST | `/saved-fields` | E | D1 | Live | `{ fields }` (partial; `null` clears a field; unknown keys ignored) | same as GET |
+| GET | `/setup` | A | C | Live | – | `{ completed, completed_at\|null, notice_dismissed, detected: { environment, site_name, home_url, primary_domain, admin_email, engineer_emails, host: { slug, label, web_server, php_version }, ssl: { issuer, valid_to }\|null, suggestions: { section: { field: string } } } }` |
+| POST | `/setup/complete` | A | C | Live | – | `{ completed, completed_at, notice_dismissed }` |
+| POST | `/setup/dismiss` | A | C | Live | – | same as `/setup/complete` (hides the setup notice for the current user) |
 
 Report editing and publishing go through the block editor and core `/wp/v2/amc-reports`. CSV export is client-side, from the loaded list.
 
@@ -394,6 +397,7 @@ Other options:
 - `amc_schema_version`
 - `amc_version`
 - `amc_delete_reports_on_uninstall` (D1 UI)
+- `amc_setup_completed` (C, autoload off): `{ completed_at, user_id }` once the setup wizard is finished (`AMC\Admin\SetupState`). User meta `amc_setup_notice_dismissed` and the transient `amc_activation_redirect` belong to the same wizard.
 
 ## 10. Capabilities
 
@@ -486,7 +490,7 @@ Rules:
 | `amc_report_email` | filter | `Mailer::send_report_*()` | `array $content, 'draft_ready'\|'published' $event, WP_Post $report` | D1 (email content) |
 | `amc_report_published_recipients` | filter | `Mailer::send_report_published()` | `list<string> $emails, WP_Post $report` | D1 |
 | `amc_scheduler_time_budget` | filter | `Scheduler::tick()` | `int $seconds` (25) | Hosts with long cron windows |
-| `amc_activate` | action | Plugin activation | – | Lanes scheduling their own cron events |
+| `amc_activate` | action | Plugin activation | – | Lanes scheduling their own cron events; the setup wizard's activation redirect |
 | `amc_deactivate` | action | Deactivation and uninstall | – | Lanes clearing their cron events |
 | `amc_scheduler_tick` | cron | Every 5 min | – | Scheduler |
 | `amc_report_draft_ready` | action | `Generator::build()`, after the FIRST snapshot of a report | `int $post_id` | A2 Mailer (`Mailer::send_report_draft_ready`); content from `ReportEmails::draft_ready()` |

@@ -54,6 +54,9 @@ final class RoutesTest extends TestCase {
 		'/amc/v1/reports/(?P<id>\d+)/regenerate'     => [ 'POST' ],
 		'/amc/v1/reports/(?P<id>\d+)/snapshot'       => [ 'GET' ],
 		'/amc/v1/saved-fields'                       => [ 'GET', 'POST' ],
+		'/amc/v1/setup'                              => [ 'GET' ],
+		'/amc/v1/setup/complete'                     => [ 'POST' ],
+		'/amc/v1/setup/dismiss'                      => [ 'POST' ],
 	];
 
 	/**

@@ -32,6 +32,7 @@ import useNotice from '../hooks/useNotice';
 import useResource from '../hooks/useResource';
 import { customField, textField } from '../utils/fields';
 import { intervalLabel } from '../utils/format';
+import { navigate, screenUrl } from '../utils/navigation';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -1144,6 +1145,25 @@ export default function Settings() {
 	return (
 		<ScreenState
 			screen="settings"
+			actions={
+				<Button
+					variant="secondary"
+					href={ screenUrl( 'setup' ) }
+					onClick={ ( event ) => {
+						if (
+							event.metaKey ||
+							event.ctrlKey ||
+							event.shiftKey
+						) {
+							return;
+						}
+						event.preventDefault();
+						navigate( 'setup' );
+					} }
+				>
+					{ __( 'Run setup again', 'rtcamp-amc-copilot' ) }
+				</Button>
+			}
 			isLoading={ isLoading }
 			error={ error }
 			onRetry={ reload }

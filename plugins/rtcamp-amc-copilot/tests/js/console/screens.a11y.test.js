@@ -24,6 +24,7 @@ const SCREENS = [
 	[ 'Runs', 'table' ],
 	[ 'Reports', 'table' ],
 	[ 'Settings', '.form-table' ],
+	[ 'Setup', '.amc-setup-steps' ],
 ];
 
 jest.setTimeout( 60000 );

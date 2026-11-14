@@ -49,6 +49,8 @@ final class RestModule extends AbstractModule {
 			NotifyController::class,
 			// D1.
 			ReportsController::class,
+			// C (setup wizard).
+			SetupController::class,
 		];
 	}
 }

@@ -116,7 +116,20 @@ export const getScreens = () => [
 			'rtcamp-amc-copilot'
 		),
 	},
+	{
+		slug: 'setup',
+		label: __( 'Setup', 'rtcamp-amc-copilot' ),
+		description: __(
+			'First-run setup: site details, report fields, notifications and the report schedule.',
+			'rtcamp-amc-copilot'
+		),
+	},
 ];
+
+/**
+ * Screens shown on their own, without the section tabs (the setup wizard).
+ */
+export const STANDALONE_SCREENS = [ 'setup' ];
 
 /**
  * Top-level navigation: a few sections, each holding one or more screens.
