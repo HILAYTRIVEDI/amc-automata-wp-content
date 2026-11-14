@@ -41,3 +41,14 @@ export const screenForFinding = ( finding ) =>
 	BY_GROUP[ finding?.group ] ??
 	BY_PREFIX[ String( finding?.check_id ?? '' ).split( '.' )[ 0 ] ] ??
 	'overview';
+
+/**
+ * Screen that shows a check group in detail, for linking from the Overview.
+ *
+ * @param {string} group Check group.
+ * @return {string|null} Screen slug, or null when the group has no screen of its own.
+ */
+export const screenForGroup = ( group ) => {
+	const screen = BY_GROUP[ group ];
+	return screen && 'overview' !== screen ? screen : null;
+};

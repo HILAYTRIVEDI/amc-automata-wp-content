@@ -305,7 +305,7 @@ export default function Smoke() {
 
 	return (
 		<ScreenState
-			title={ __( 'Smoke checks', 'rtcamp-amc-copilot' ) }
+			screen="smoke"
 			actions={
 				<>
 					<Button
@@ -344,6 +344,7 @@ export default function Smoke() {
 						actions={ actions }
 						getItemId={ ( item ) => item.url }
 						exportName="amc-smoke-checks"
+						variant="full"
 						label={ __( 'Smoke check URLs', 'rtcamp-amc-copilot' ) }
 					/>
 				</>

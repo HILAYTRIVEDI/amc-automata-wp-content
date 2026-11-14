@@ -243,10 +243,11 @@ export default function Vulnerabilities() {
 
 	return (
 		<ScreenState
-			title={ __( 'Vulnerabilities', 'rtcamp-amc-copilot' ) }
+			screen="vulnerabilities"
 			actions={
 				<RunChecksButton
 					checkIds={ SCREEN_CHECKS.vulnerabilities }
+					variant="primary"
 					label={ __( 'Run check', 'rtcamp-amc-copilot' ) }
 					onComplete={ reload }
 				/>
@@ -273,6 +274,7 @@ export default function Vulnerabilities() {
 						fields={ fields }
 						actions={ actions }
 						exportName="amc-vulnerabilities"
+						variant="full"
 						label={ __(
 							'Vulnerability matches',
 							'rtcamp-amc-copilot'

@@ -79,10 +79,11 @@ export default function Inventory() {
 
 	return (
 		<ScreenState
-			title={ __( 'Inventory', 'rtcamp-amc-copilot' ) }
+			screen="inventory"
 			actions={
 				<RunChecksButton
 					checkIds={ SCREEN_CHECKS.inventory }
+					variant="primary"
 					label={ __( 'Run check', 'rtcamp-amc-copilot' ) }
 					onComplete={ reload }
 				/>

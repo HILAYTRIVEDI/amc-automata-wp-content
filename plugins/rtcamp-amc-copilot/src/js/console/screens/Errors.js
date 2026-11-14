@@ -192,7 +192,7 @@ export default function Errors() {
 
 	return (
 		<ScreenState
-			title={ __( 'Errors', 'rtcamp-amc-copilot' ) }
+			screen="errors"
 			isLoading={ isLoading }
 			error={ error }
 			onRetry={ reload }
@@ -217,6 +217,7 @@ export default function Errors() {
 						actions={ actions }
 						getItemId={ ( item ) => item.signature }
 						exportName="amc-errors"
+						variant="full"
 						label={ __(
 							'Errors by signature',
 							'rtcamp-amc-copilot'

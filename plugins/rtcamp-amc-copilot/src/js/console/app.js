@@ -12,7 +12,7 @@ import { __, sprintf } from '@wordpress/i18n';
 import { isMockMode } from './api';
 import FindingModal from './components/FindingModal';
 import FindingRedirect from './components/FindingRedirect';
-import { getScreens } from './constants';
+import { getScreen, getSections, sectionFor } from './constants';
 import Changes from './screens/Changes';
 import Errors from './screens/Errors';
 import Inventory from './screens/Inventory';
@@ -48,8 +48,40 @@ const COMPONENTS = {
 };
 
 /**
- * Console shell: heading, screen navigation and the active screen. The screen
- * comes from the `screen` query arg (`?page=amc-copilot&screen=updates`).
+ * A navigation link to a screen that switches screens without reloading
+ * the page (modified clicks still open a new tab).
+ *
+ * @param {Object}  props
+ * @param {string}  props.screen    Screen slug.
+ * @param {string}  props.className Link class.
+ * @param {string}  [props.current] `aria-current` value when this link is the current one.
+ * @param {Element} props.children  Link text.
+ * @return {Element} Link.
+ */
+function ScreenLink( { screen, className, current, children } ) {
+	return (
+		<a
+			className={ className }
+			href={ screenUrl( screen ) }
+			aria-current={ current }
+			onClick={ ( event ) => {
+				if ( event.metaKey || event.ctrlKey || event.shiftKey ) {
+					return;
+				}
+				event.preventDefault();
+				navigate( screen );
+			} }
+		>
+			{ children }
+		</a>
+	);
+}
+
+/**
+ * Console shell: page heading, section tabs (core `nav-tab-wrapper`), the
+ * section's screens as core `subsubsub` links when it has more than one, and
+ * the active screen. The screen comes from the `screen` query arg
+ * (`?page=amc-copilot&screen=updates`), so existing links keep working.
  *
  * Two deep links are handled here:
  * - `screen=findings&finding=<id>` (alert emails) redirects to the screen of
@@ -60,10 +92,10 @@ const COMPONENTS = {
  */
 export default function App() {
 	const { screen, finding } = useLocation();
-	const screens = getScreens();
 	const isFindingLink = 'findings' === screen;
 	const current = COMPONENTS[ screen ] ? screen : 'overview';
 	const Screen = COMPONENTS[ current ];
+	const section = sectionFor( current );
 	const firstScreen = useRef( true );
 	useFocusHeadingOnClose( ! isFindingLink && !! finding );
 
@@ -74,7 +106,7 @@ export default function App() {
 			firstScreen.current = false;
 			return;
 		}
-		const label = screens.find( ( item ) => item.slug === current )?.label;
+		const label = getScreen( current )?.label;
 		if ( label ) {
 			speak(
 				sprintf(
@@ -85,7 +117,6 @@ export default function App() {
 				'polite'
 			);
 		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [ current ] );
 
 	return (
@@ -103,35 +134,64 @@ export default function App() {
 				</Notice>
 			) }
 			<nav
-				className="nav-tab-wrapper"
+				className="nav-tab-wrapper amc-nav"
 				aria-label={ __( 'AMC Copilot screens', 'rtcamp-amc-copilot' ) }
 			>
-				{ screens.map( ( item ) => (
-					<a
-						key={ item.slug }
-						className={ `nav-tab${ ! isFindingLink && item.slug === current ? ' nav-tab-active' : '' }` }
-						href={ screenUrl( item.slug ) }
-						aria-current={
-							! isFindingLink && item.slug === current
-								? 'page'
-								: undefined
-						}
-						onClick={ ( event ) => {
-							if (
-								event.metaKey ||
-								event.ctrlKey ||
-								event.shiftKey
-							) {
-								return;
-							}
-							event.preventDefault();
-							navigate( item.slug );
-						} }
-					>
-						{ item.label }
-					</a>
-				) ) }
+				{ getSections().map( ( item ) => {
+					const active =
+						! isFindingLink && item.slug === section.slug;
+					let ariaCurrent;
+					if ( active ) {
+						// The tab is the page itself only when the section has one screen.
+						ariaCurrent =
+							1 === item.screens.length ? 'page' : 'true';
+					}
+					return (
+						<ScreenLink
+							key={ item.slug }
+							screen={ item.screens[ 0 ] }
+							className={ `nav-tab${ active ? ' nav-tab-active' : '' }` }
+							current={ ariaCurrent }
+						>
+							{ item.label }
+						</ScreenLink>
+					);
+				} ) }
 			</nav>
+			{ ! isFindingLink && section.screens.length > 1 && (
+				<nav
+					className="amc-subnav"
+					aria-label={ sprintf(
+						/* translators: %s: section name, e.g. Checks. */
+						__( '%s screens', 'rtcamp-amc-copilot' ),
+						section.label
+					) }
+				>
+					<ul className="subsubsub">
+						{ section.screens.map( ( slug, index ) => (
+							<li key={ slug }>
+								<ScreenLink
+									screen={ slug }
+									className={
+										slug === current ? 'current' : undefined
+									}
+									current={
+										slug === current ? 'page' : undefined
+									}
+								>
+									{ getScreen( slug ).label }
+								</ScreenLink>
+								{ index < section.screens.length - 1 && (
+									<span aria-hidden="true">
+										{ ' |\u00a0' }
+									</span>
+								) }
+							</li>
+						) ) }
+					</ul>
+					<div className="clear" />
+				</nav>
+			) }
 			{ isFindingLink ? (
 				<FindingRedirect findingId={ finding } />
 			) : (

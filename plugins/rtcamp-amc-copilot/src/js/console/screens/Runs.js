@@ -261,7 +261,7 @@ export default function Runs() {
 
 	return (
 		<ScreenState
-			title={ __( 'Runs', 'rtcamp-amc-copilot' ) }
+			screen="runs"
 			isLoading={ isLoading }
 			error={ error }
 			onRetry={ reload }
@@ -273,6 +273,7 @@ export default function Runs() {
 					fields={ fields }
 					actions={ actions }
 					exportName="amc-runs"
+					variant="full"
 					label={ __( 'Run history', 'rtcamp-amc-copilot' ) }
 					initialView={ {
 						fields: fields

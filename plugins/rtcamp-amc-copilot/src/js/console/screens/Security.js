@@ -24,10 +24,11 @@ export default function Security() {
 
 	return (
 		<ScreenState
-			title={ __( 'Security', 'rtcamp-amc-copilot' ) }
+			screen="security"
 			actions={
 				<RunChecksButton
 					checkIds={ SCREEN_CHECKS.security }
+					variant="primary"
 					label={ __( 'Run check', 'rtcamp-amc-copilot' ) }
 					onComplete={ reload }
 				/>

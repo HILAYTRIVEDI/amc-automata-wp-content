@@ -133,7 +133,7 @@ export default function Changes() {
 
 	return (
 		<ScreenState
-			title={ __( 'Changes', 'rtcamp-amc-copilot' ) }
+			screen="changes"
 			isLoading={ isLoading }
 			error={ error }
 			onRetry={ reload }
@@ -183,6 +183,7 @@ export default function Changes() {
 					data={ data.items }
 					fields={ fields }
 					exportName="amc-changes"
+					variant="full"
 					label={ __( 'Change log', 'rtcamp-amc-copilot' ) }
 					isLoading={ isLoading }
 				/>

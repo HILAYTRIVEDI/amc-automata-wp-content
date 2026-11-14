@@ -5,18 +5,32 @@
  */
 @use '../../../node_modules/@wordpress/dataviews/build-style/style';
 
-/* Layout only; colours and type come from WordPress core. */
-.amc-console .nav-tab-wrapper {
-	margin-bottom: 16px;
-}
+/*
+ * Layout only. Colours, type and boxes come from core admin classes
+ * (nav-tab, subsubsub, postbox, widefat, form-table, notice) and
+ * @wordpress/components.
+ */
 
+// Screen heading: title and description on the left, actions on the right.
 .amc-screen-head {
 	display: flex;
 	flex-wrap: wrap;
-	align-items: center;
+	align-items: flex-start;
 	justify-content: space-between;
-	gap: 8px;
-	margin: 8px 0;
+	gap: 8px 16px;
+	margin: 16px 0;
+
+	h2 {
+		margin: 0 0 4px;
+	}
+
+	.description {
+		margin: 0;
+	}
+}
+
+.amc-subnav + .amc-screen .amc-screen-head {
+	margin-top: 8px;
 }
 
 .amc-screen-actions,
@@ -29,6 +43,21 @@
 	gap: 8px;
 }
 
+// A run result notice sits under the button, not beside it.
+.amc-screen-actions {
+	justify-content: flex-end;
+	max-width: 100%;
+
+	.amc-run-now {
+		justify-content: flex-end;
+	}
+
+	.components-notice {
+		flex-basis: 100%;
+		margin: 0;
+	}
+}
+
 .amc-modal-actions {
 	justify-content: flex-end;
 	margin-top: 16px;
@@ -39,35 +68,152 @@
 	margin-bottom: 12px;
 }
 
-.amc-grid {
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-	gap: 16px;
-	margin-bottom: 16px;
+.amc-loading {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+
+	.components-spinner {
+		margin: 0;
+	}
 }
 
-.amc-check-panel {
-	margin-bottom: 16px;
+// Postbox: the header spacing core gives boxes inside #poststuff and
+// #dashboard-widgets, room for a badge, and tables flush with its edges.
+.amc-postbox {
+
+	.postbox-header .hndle {
+		margin: 0;
+		padding: 8px 12px;
+		font-size: 14px;
+		line-height: 1.4;
+	}
+
+	.amc-postbox-actions {
+		padding: 0 12px;
+	}
+
+	.inside > .amc-simple-table:first-child,
+	.inside > .amc-kv:first-child {
+		margin-top: -11px;
+	}
+
+	.inside > .amc-simple-table .widefat,
+	.inside > .amc-kv {
+		border-width: 0 0 1px;
+		margin: 0 -12px;
+		width: calc(100% + 24px);
+	}
+
+	.inside > .amc-simple-table .tablenav {
+		margin-bottom: 0;
+	}
+
+	.inside > .amc-simple-table:last-child,
+	.inside > .amc-kv:last-child {
+		margin-bottom: -12px;
+	}
+
+	.dataviews-wrapper {
+		margin: 0 -12px;
+	}
 }
 
-.amc-check-panel-title,
-.amc-card-title,
-.amc-check-data-section h4 {
-	margin: 0;
+.amc-check-summary {
+	font-size: 14px;
 }
 
 .amc-check-data-section {
-	margin-top: 16px;
+	margin-top: 20px;
+
+	h4 {
+		margin: 0 0 8px;
+	}
 }
 
-.amc-list {
-	margin: 0;
-	padding: 0;
-	list-style: none;
+// Label/value tables (as on Site Health's Info tab).
+.amc-kv th {
+	width: 35%;
+	font-weight: 400;
+}
 
-	li + li {
-		margin-top: 6px;
+.amc-simple-table .widefat td {
+	vertical-align: middle;
+}
+
+.amc-simple-table .tablenav .actions {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+// Overview.
+.amc-summary-body {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px 48px;
+	justify-content: space-between;
+}
+
+.amc-summary-headline {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	margin: 0 0 8px;
+	font-size: 16px;
+}
+
+.amc-summary-findings h4 {
+	margin: 0 0 8px;
+}
+
+.amc-severity-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 16px;
+	margin: 0;
+
+	li {
+		margin: 0;
 	}
+}
+
+.amc-columns {
+	display: grid;
+	grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+	gap: 0 20px;
+	align-items: start;
+}
+
+@media (max-width: 960px) {
+
+	.amc-columns {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+.amc-trend {
+	margin-top: 0;
+}
+
+// Tabs inside a screen (Inventory, Settings).
+.amc-tabs [role="tablist"] {
+	margin-bottom: 16px;
+}
+
+.amc-tab-content > .form-table:first-child,
+.amc-tab-content > h3:first-child {
+	margin-top: 0;
+}
+
+.amc-json {
+	max-height: 60vh;
+	overflow: auto;
+}
+
+.amc-sparkline {
+	vertical-align: middle;
 }
 
 .amc-dl {
@@ -81,15 +227,12 @@
 	}
 }
 
-.amc-dl-row {
-	display: contents;
-}
+.amc-list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
 
-.amc-json {
-	max-height: 60vh;
-	overflow: auto;
-}
-
-.amc-sparkline {
-	vertical-align: middle;
+	li + li {
+		margin-top: 6px;
+	}
 }

@@ -12,7 +12,8 @@ import DataTable from './DataTable';
 import StatusBadge from './StatusBadge';
 
 const STATUSES = [ 'pass', 'warn', 'fail', 'info' ];
-const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+const ISO =
+	/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})$/;
 const MAX_COLUMNS = 9;
 const MAX_DEPTH = 3;
 
@@ -39,6 +40,9 @@ const knownLabels = () => ( {
 	login: __( 'Username', 'rtcamp-amc-copilot' ),
 	email: __( 'Email', 'rtcamp-amc-copilot' ),
 	php: __( 'PHP', 'rtcamp-amc-copilot' ),
+	php_version: __( 'PHP version', 'rtcamp-amc-copilot' ),
+	mysql_version: __( 'MySQL version', 'rtcamp-amc-copilot' ),
+	wp_org: __( 'On wordpress.org', 'rtcamp-amc-copilot' ),
 	file: __( 'File', 'rtcamp-amc-copilot' ),
 	parent: __( 'Parent theme', 'rtcamp-amc-copilot' ),
 	issuer: __( 'Issuer', 'rtcamp-amc-copilot' ),
@@ -102,6 +106,9 @@ const plain = ( value ) => {
 export function DataValue( { name, value } ) {
 	if ( null === value || undefined === value || '' === value ) {
 		return <span>{ '—' }</span>;
+	}
+	if ( Array.isArray( value ) && ! value.length ) {
+		return <span>{ __( 'None', 'rtcamp-amc-copilot' ) }</span>;
 	}
 	if ( 'boolean' === typeof value ) {
 		return (
@@ -231,8 +238,8 @@ export function RowsTable( { name, rows, prefix, title } ) {
 
 /**
  * Render a check's `Result::$data` without knowing its shape: scalars as a
- * description list, arrays of objects as tables, nested objects as sections,
- * anything deeper as JSON.
+ * two-column core table (label, value; as on Site Health's Info tab), arrays
+ * of objects as tables, nested objects as sections, anything deeper as JSON.
  *
  * @param {Object} props
  * @param {Object} props.data    The data object.
@@ -272,16 +279,27 @@ export default function CheckData( { data, prefix, title, depth = 0 } ) {
 	return (
 		<div className="amc-check-data">
 			{ simple.length > 0 && (
-				<dl className="amc-dl">
-					{ simple.map( ( [ key, value ] ) => (
-						<div key={ key } className="amc-dl-row">
-							<dt>{ labelFor( key ) }</dt>
-							<dd>
-								<DataValue name={ key } value={ value } />
-							</dd>
-						</div>
-					) ) }
-				</dl>
+				<table className="widefat striped amc-kv">
+					<caption className="screen-reader-text">
+						{ title
+							? sprintf(
+									/* translators: %s: check name. */
+									__( '%s: details', 'rtcamp-amc-copilot' ),
+									title
+								)
+							: __( 'Details', 'rtcamp-amc-copilot' ) }
+					</caption>
+					<tbody>
+						{ simple.map( ( [ key, value ] ) => (
+							<tr key={ key }>
+								<th scope="row">{ labelFor( key ) }</th>
+								<td>
+									<DataValue name={ key } value={ value } />
+								</td>
+							</tr>
+						) ) }
+					</tbody>
+				</table>
 			) }
 			{ complex.map( ( [ key, value ] ) => (
 				<div key={ key } className="amc-check-data-section">

@@ -27,10 +27,11 @@ export default function Updates() {
 
 	return (
 		<ScreenState
-			title={ __( 'Updates', 'rtcamp-amc-copilot' ) }
+			screen="updates"
 			actions={
 				<RunChecksButton
 					checkIds={ SCREEN_CHECKS.updates }
+					variant="primary"
 					label={ __( 'Run check', 'rtcamp-amc-copilot' ) }
 					onComplete={ reload }
 				/>

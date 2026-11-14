@@ -8,6 +8,7 @@ import { __, sprintf } from '@wordpress/i18n';
  * Internal dependencies
  */
 import { isNotImplemented } from '../api';
+import { getScreen } from '../constants';
 
 /**
  * Notice for a request that failed: a calm "not available yet" for routes
@@ -87,22 +88,42 @@ export function StubNotice( { lane } ) {
 }
 
 /**
- * Screen frame: heading, actions, and the loading and error states of the
- * screen's main request.
+ * Loading state: core spinner with a visible, announced label.
+ *
+ * @param {Object} props
+ * @param {string} [props.label] Text; defaults to "Loading…".
+ * @return {Element} Status.
+ */
+export function Loading( { label } ) {
+	return (
+		<p role="status" className="amc-loading">
+			<Spinner />
+			<span>{ label ?? __( 'Loading…', 'rtcamp-amc-copilot' ) }</span>
+		</p>
+	);
+}
+
+/**
+ * Screen frame: heading with the screen's one-line description, actions,
+ * and the loading and error states of the screen's main request.
  *
  * @param {Object}                          props
- * @param {string}                          props.title     Heading.
- * @param {Element}                         [props.actions] Buttons shown next to the heading.
- * @param {boolean}                         props.isLoading Loading state.
- * @param {Error}                           [props.error]   Request error.
- * @param {(...args: unknown[]) => unknown} [props.onRetry] Retry handler for the error notice.
- * @param {boolean}                         props.hasData   Whether data has loaded.
- * @param {string}                          [props.stub]    Lane stubbing part of the data.
- * @param {Element}                         props.children  Screen content, rendered once data exists.
+ * @param {string}                          [props.screen]      Screen slug; supplies the heading and description.
+ * @param {string}                          [props.title]       Heading (overrides the screen's label).
+ * @param {string}                          [props.description] Description (overrides the screen's).
+ * @param {Element}                         [props.actions]     Buttons shown next to the heading.
+ * @param {boolean}                         props.isLoading     Loading state.
+ * @param {Error}                           [props.error]       Request error.
+ * @param {(...args: unknown[]) => unknown} [props.onRetry]     Retry handler for the error notice.
+ * @param {boolean}                         props.hasData       Whether data has loaded.
+ * @param {string}                          [props.stub]        Lane stubbing part of the data.
+ * @param {Element}                         props.children      Screen content, rendered once data exists.
  * @return {Element} Frame.
  */
 export default function ScreenState( {
+	screen,
 	title,
+	description,
 	actions,
 	isLoading,
 	error,
@@ -111,28 +132,25 @@ export default function ScreenState( {
 	stub,
 	children,
 } ) {
+	const info = screen ? getScreen( screen ) : undefined;
+	const heading = title ?? info?.label;
+	const intro = description ?? info?.description;
 	return (
 		<section className="amc-screen" aria-labelledby="amc-screen-title">
 			<div className="amc-screen-head">
-				<h2
-					id="amc-screen-title"
-					className="wp-heading-inline"
-					tabIndex={ -1 }
-				>
-					{ title }
-				</h2>
-				<div className="amc-screen-actions">{ actions }</div>
+				<div className="amc-screen-title">
+					<h2 id="amc-screen-title" tabIndex={ -1 }>
+						{ heading }
+					</h2>
+					{ intro && <p className="description">{ intro }</p> }
+				</div>
+				{ actions && (
+					<div className="amc-screen-actions">{ actions }</div>
+				) }
 			</div>
 			{ error && <ErrorNotice error={ error } onRetry={ onRetry } /> }
 			<StubNotice lane={ stub } />
-			{ isLoading && ! hasData && ! error && (
-				<p role="status">
-					<Spinner />{ ' ' }
-					<span className="screen-reader-text">
-						{ __( 'Loading…', 'rtcamp-amc-copilot' ) }
-					</span>
-				</p>
-			) }
+			{ isLoading && ! hasData && ! error && <Loading /> }
 			{ hasData && children }
 		</section>
 	);
