@@ -11,6 +11,7 @@ namespace AMC\Tests\Reports;
 
 use AMC\Reports\ClientView;
 use AMC\Reports\ReportPostType;
+use AMC\Reports\SnapshotSchema;
 
 /**
  * Class ClientViewTest
@@ -177,11 +178,69 @@ final class ClientViewTest extends ReportsTestCase {
 		$this->rendered();
 	}
 
+	public function test_section_blocks_read_the_report_snapshot_on_this_admin_page(): void {
+		$snapshot                                        = SnapshotSchema::empty_snapshot();
+		$snapshot['sections']['overview']['website_url'] = 'https://client.example';
+		$report = self::factory()->post->create(
+			[
+				'post_type'    => ReportPostType::SLUG,
+				'post_status'  => 'publish',
+				'post_title'   => 'November Report',
+				'post_content' => '<!-- wp:amc/section-overview /-->',
+			]
+		);
+		update_post_meta( $report, SnapshotSchema::META_KEY, wp_slash( wp_json_encode( $snapshot ) ) );
+		update_post_meta( $report, '_amc_report_id', 'AMC-T-2026-11' );
+
+		wp_set_current_user( $this->client );
+		$_GET['report'] = (string) $report;
+		$html           = $this->rendered();
+
+		$this->assertStringContainsString( 'https://client.example', $html, 'the section shows snapshot data, not an empty value' );
+		$this->assertStringContainsString( 'data-amc-download="AMC-T-2026-11"', $html, 'the PDF is named after the report ID' );
+		$this->assertStringContainsString( 'Download PDF', $html );
+	}
+
+	public function test_list_and_record_fields_render_readably_not_as_json(): void {
+		$snapshot = SnapshotSchema::empty_snapshot();
+		$snapshot['sections']['user_management']['users_per_role'] = [
+			[
+				'role'  => 'administrator',
+				'label' => 'Administrator',
+				'count' => 2,
+			],
+		];
+		$snapshot['sections']['plugins_themes']['counts']          = [
+			'installed' => 12,
+			'active'    => 10,
+		];
+		$snapshot['sections']['plugins_themes']['removed']         = [];
+		$report = self::factory()->post->create(
+			[
+				'post_type'    => ReportPostType::SLUG,
+				'post_status'  => 'publish',
+				'post_content' => '<!-- wp:amc/section-user-management /--><!-- wp:amc/section-plugins-themes /-->',
+			]
+		);
+		update_post_meta( $report, SnapshotSchema::META_KEY, wp_slash( wp_json_encode( $snapshot ) ) );
+
+		wp_set_current_user( $this->client );
+		$_GET['report'] = (string) $report;
+		$html           = $this->rendered();
+
+		$this->assertStringContainsString( '<table class="amc-subtable">', $html );
+		$this->assertStringContainsString( '<td>Administrator</td>', $html );
+		$this->assertStringContainsString( 'Installed:</span> 12', $html );
+		$this->assertStringContainsString( '>None<', $html, 'an empty list reads "None"' );
+		$this->assertStringNotContainsString( '&quot;role&quot;', $html );
+		$this->assertStringNotContainsString( '{&quot;', $html );
+	}
+
 	public function test_an_engineer_can_preview_a_draft_here(): void {
 		wp_set_current_user( $this->engineer );
 		$_GET['report'] = (string) $this->draft;
 
-		$this->assertStringContainsString( 'draft preview', $this->rendered() );
+		$this->assertStringContainsString( 'Draft preview', $this->rendered() );
 	}
 
 	public function test_something_that_is_not_a_report_is_not_found(): void {

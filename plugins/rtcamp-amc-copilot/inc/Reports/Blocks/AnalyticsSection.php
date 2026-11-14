@@ -33,15 +33,15 @@ final class AnalyticsSection extends AbstractSectionBlock {
 
 		// gtm_ids (list) rendered below if applicable.
 		$gtm_ids = $data->value( 'gtm_ids' );
-		if ( is_array( $gtm_ids ) && [] !== $gtm_ids ) {
-			$rows[] = [ $data->label( 'gtm_ids' ), esc_html( wp_json_encode( $gtm_ids ) ) ];
+		if ( is_array( $gtm_ids ) ) {
+			$rows[] = [ $data->label( 'gtm_ids' ), $this->format_structured( $gtm_ids ) ];
 		} else {
 			$rows[] = [ $data->label( 'gtm_ids' ), esc_html__( '—', 'rtcamp-amc-copilot' ) ];
 		}
 		// ga_ids (list) rendered below if applicable.
 		$ga_ids = $data->value( 'ga_ids' );
-		if ( is_array( $ga_ids ) && [] !== $ga_ids ) {
-			$rows[] = [ $data->label( 'ga_ids' ), esc_html( wp_json_encode( $ga_ids ) ) ];
+		if ( is_array( $ga_ids ) ) {
+			$rows[] = [ $data->label( 'ga_ids' ), $this->format_structured( $ga_ids ) ];
 		} else {
 			$rows[] = [ $data->label( 'ga_ids' ), esc_html__( '—', 'rtcamp-amc-copilot' ) ];
 		}

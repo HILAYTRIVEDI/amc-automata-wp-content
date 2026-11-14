@@ -173,7 +173,89 @@ abstract class AbstractSectionBlock extends AbstractBlock {
 			'bool'  => $value ? esc_html__( 'Yes', 'rtcamp-amc-copilot' ) : esc_html__( 'No', 'rtcamp-amc-copilot' ),
 			'date'  => esc_html( (string) mysql2date( get_option( 'date_format' ), (string) $value ) ),
 			'html'  => wp_kses_post( (string) $value ),
-			default => esc_html( is_scalar( $value ) ? (string) $value : (string) wp_json_encode( $value ) ),
+			default => is_scalar( $value ) ? esc_html( (string) $value ) : $this->format_structured( $value ),
 		};
+	}
+
+	/**
+	 * Escaped HTML for a list or record value, readable by a client.
+	 *
+	 * - list of records:  a small table, one column per key;
+	 * - record:           "Label: value" list;
+	 * - list of scalars:  comma-separated;
+	 * - empty list:       "None".
+	 *
+	 * @param mixed $value Value from the snapshot.
+	 *
+	 * @return string Escaped HTML.
+	 */
+	protected function format_structured( mixed $value ): string {
+		if ( null === $value || '' === $value ) {
+			return esc_html__( '—', 'rtcamp-amc-copilot' );
+		}
+
+		if ( is_bool( $value ) ) {
+			return $value ? esc_html__( 'Yes', 'rtcamp-amc-copilot' ) : esc_html__( 'No', 'rtcamp-amc-copilot' );
+		}
+
+		if ( ! is_array( $value ) ) {
+			return esc_html( (string) $value );
+		}
+
+		if ( [] === $value ) {
+			return esc_html__( 'None', 'rtcamp-amc-copilot' );
+		}
+
+		if ( array_is_list( $value ) ) {
+			if ( ! is_array( $value[0] ) ) {
+				return esc_html( implode( ', ', array_map( 'strval', array_filter( $value, 'is_scalar' ) ) ) );
+			}
+
+			$keys = [];
+			foreach ( $value as $row ) {
+				$keys = array_unique( array_merge( $keys, is_array( $row ) ? array_keys( $row ) : [] ) );
+			}
+
+			$head = '';
+			foreach ( $keys as $key ) {
+				$head .= '<th scope="col">' . esc_html( self::humanize_key( (string) $key ) ) . '</th>';
+			}
+
+			$body = '';
+			foreach ( $value as $row ) {
+				$body .= '<tr>';
+				foreach ( $keys as $key ) {
+					$body .= '<td>' . $this->format_structured( is_array( $row ) ? ( $row[ $key ] ?? null ) : null ) . '</td>';
+				}
+				$body .= '</tr>';
+			}
+
+			return '<table class="amc-subtable"><thead><tr>' . $head . '</tr></thead><tbody>' . $body . '</tbody></table>';
+		}
+
+		$items = '';
+		foreach ( $value as $key => $item ) {
+			$items .= '<li><span class="amc-kv-label">' . esc_html( self::humanize_key( (string) $key ) ) . ':</span> ' . $this->format_structured( $item ) . '</li>';
+		}
+
+		return '<ul class="amc-kv-list">' . $items . '</ul>';
+	}
+
+	/**
+	 * "themes_installed" → "Themes installed".
+	 *
+	 * @param string $key Snapshot key.
+	 */
+	private static function humanize_key( string $key ): string {
+		$labels = [
+			'avg_response_ms' => __( 'Avg response (ms)', 'rtcamp-amc-copilot' ),
+			'pass_rate'       => __( 'Pass rate', 'rtcamp-amc-copilot' ),
+			'fixed_in'        => __( 'Fixed in', 'rtcamp-amc-copilot' ),
+			'old_version'     => __( 'From', 'rtcamp-amc-copilot' ),
+			'new_version'     => __( 'To', 'rtcamp-amc-copilot' ),
+			'display_name'    => __( 'Name', 'rtcamp-amc-copilot' ),
+		];
+
+		return $labels[ $key ] ?? ucfirst( str_replace( '_', ' ', $key ) );
 	}
 }

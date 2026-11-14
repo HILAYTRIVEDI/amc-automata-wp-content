@@ -1,0 +1,274 @@
+/**
+ * Report view: the client-ready document on the single-report admin page.
+ *
+ * No colour values of its own: text and paper use the CSS system colours
+ * (CanvasText / Canvas) and every rule or tint is a mix of the current text
+ * colour, so the document follows the admin colour scheme and prints cleanly.
+ */
+
+$rule: color-mix(in srgb, currentcolor 14%, transparent);
+$tint: color-mix(in srgb, currentcolor 4%, transparent);
+$muted: color-mix(in srgb, currentcolor 62%, transparent);
+
+.amc-report-view {
+	max-width: 960px;
+}
+
+.amc-report-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	margin: 12px 0 16px;
+
+	.description {
+		flex-basis: 100%;
+		margin: 0;
+	}
+}
+
+.amc-report-document {
+	counter-reset: amc-section;
+	background: Canvas;
+	color: CanvasText;
+	border: 1px solid $rule;
+	padding: 48px 56px 32px;
+	font-size: 14px;
+	line-height: 1.6;
+}
+
+/* Cover */
+
+.amc-report-cover {
+	padding-bottom: 28px;
+	margin-bottom: 8px;
+	border-bottom: 2px solid currentcolor;
+
+	&__brand {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 16px;
+		margin-bottom: 40px;
+	}
+
+	&__kind {
+		font-size: 12px;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: $muted;
+	}
+
+	&__title {
+		margin: 0 0 6px;
+		padding: 0;
+		font-size: 30px;
+		font-weight: 600;
+		line-height: 1.25;
+	}
+
+	&__site {
+		margin: 0 0 24px;
+		font-size: 15px;
+		color: $muted;
+
+		a {
+			color: inherit;
+		}
+	}
+
+	&__facts {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+		gap: 16px 24px;
+		margin: 0;
+
+		dt {
+			margin: 0 0 2px;
+			font-size: 11px;
+			font-weight: 600;
+			letter-spacing: 0.06em;
+			text-transform: uppercase;
+			color: $muted;
+		}
+
+		dd {
+			margin: 0;
+			font-weight: 600;
+		}
+	}
+}
+
+.amc-report-logo {
+	display: block;
+	height: 32px;
+	width: auto;
+}
+
+/* Sections */
+
+.amc-report .amc-section {
+	counter-increment: amc-section;
+	margin: 0;
+	padding: 28px 0 8px;
+	border-bottom: 1px solid $rule;
+
+	&:last-child {
+		border-bottom: 0;
+	}
+
+	> .wp-block-heading,
+	> h2 {
+		display: flex;
+		align-items: baseline;
+		gap: 12px;
+		margin: 0 0 14px;
+		padding: 0;
+		font-size: 18px;
+		font-weight: 600;
+
+		&::before {
+			content: counter(amc-section, decimal-leading-zero);
+			font-size: 12px;
+			font-weight: 600;
+			color: $muted;
+			font-variant-numeric: tabular-nums;
+		}
+	}
+
+	h3 {
+		margin: 18px 0 8px;
+		font-size: 14px;
+	}
+
+	.wp-block-table {
+		margin: 0 0 12px;
+		overflow-x: auto;
+	}
+
+	table {
+		width: 100%;
+		border-collapse: collapse;
+		border: 0;
+	}
+
+	th,
+	td {
+		padding: 9px 12px;
+		border: 0;
+		border-bottom: 1px solid $rule;
+		text-align: start;
+		vertical-align: top;
+	}
+
+	tbody th[scope="row"] {
+		width: 38%;
+		font-weight: 500;
+		color: $muted;
+	}
+
+	thead th {
+		font-size: 12px;
+		font-weight: 600;
+		background: $tint;
+	}
+
+	tbody tr:last-child > * {
+		border-bottom: 0;
+	}
+
+	ul,
+	ol {
+		margin: 0 0 12px 1.25em;
+	}
+}
+
+.amc-report .amc-section .amc-subtable {
+	margin: 0;
+	font-size: 12px;
+
+	th,
+	td {
+		padding: 4px 8px;
+	}
+
+	thead th {
+		font-weight: 600;
+		background: $tint;
+	}
+}
+
+.amc-report .amc-kv-list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+
+	li {
+		margin: 0;
+	}
+}
+
+.amc-report .amc-kv-label {
+	color: $muted;
+}
+
+.amc-report .amc-disclaimer {
+	margin: 4px 0 12px;
+	padding: 10px 12px;
+	background: $tint;
+	border-inline-start: 3px solid $rule;
+	font-size: 12px;
+	font-style: normal;
+	color: $muted;
+}
+
+.amc-report .amc-trend-chart {
+	margin: 8px 0 12px;
+	max-width: 520px;
+}
+
+.amc-report-footer {
+	margin-top: 24px;
+	padding-top: 12px;
+	border-top: 1px solid $rule;
+	font-size: 12px;
+	color: $muted;
+
+	p {
+		margin: 0;
+	}
+}
+
+@media screen and (max-width: 782px) {
+
+	.amc-report-document {
+		padding: 24px 16px;
+	}
+
+	.amc-report .amc-section tbody th[scope="row"] {
+		width: 45%;
+	}
+}
+
+@media print {
+
+	.amc-report-view {
+		max-width: none;
+		margin: 0;
+	}
+
+	.amc-report-document {
+		border: 0;
+		padding: 0;
+		font-size: 10.5pt;
+	}
+
+	.amc-report-cover {
+		break-after: avoid;
+	}
+
+	.amc-report-footer {
+		break-inside: avoid;
+	}
+}

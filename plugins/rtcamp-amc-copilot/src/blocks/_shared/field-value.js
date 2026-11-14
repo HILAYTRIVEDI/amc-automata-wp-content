@@ -31,8 +31,34 @@ export function formatValue( value, type = 'string' ) {
 			return `${ name } ${ value.version || '' }`.trim();
 		}
 	}
+	if ( Array.isArray( value ) ) {
+		// List of records: their names; list of scalars: comma-separated.
+		return value
+			.map( ( item ) =>
+				item && typeof item === 'object'
+					? item.name ||
+						item.label ||
+						item.display_name ||
+						item.login ||
+						item.slug ||
+						item.url ||
+						Object.values( item ).join( ' ' )
+					: String( item )
+			)
+			.join( ', ' );
+	}
 	if ( typeof value === 'object' ) {
-		return JSON.stringify( value );
+		// Record: "Installed: 12, Active: 10".
+		return Object.entries( value )
+			.map(
+				( [ key, item ] ) =>
+					`${ key.charAt( 0 ).toUpperCase() }${ key
+						.slice( 1 )
+						.replace( /_/g, ' ' ) }: ${
+						Array.isArray( item ) ? item.length : item
+					}`
+			)
+			.join( ', ' );
 	}
 	return String( value );
 }

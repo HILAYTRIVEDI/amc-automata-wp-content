@@ -33,22 +33,22 @@ final class SecuritySection extends AbstractSectionBlock {
 
 		// vulnerabilities (list) rendered below if applicable.
 		$vulnerabilities = $data->value( 'vulnerabilities' );
-		if ( is_array( $vulnerabilities ) && [] !== $vulnerabilities ) {
-			$rows[] = [ $data->label( 'vulnerabilities' ), esc_html( wp_json_encode( $vulnerabilities ) ) ];
+		if ( is_array( $vulnerabilities ) ) {
+			$rows[] = [ $data->label( 'vulnerabilities' ), $this->format_structured( $vulnerabilities ) ];
 		} else {
 			$rows[] = [ $data->label( 'vulnerabilities' ), esc_html__( '—', 'rtcamp-amc-copilot' ) ];
 		}
 		// core_checksums (object) rendered below if applicable.
 		$core_checksums = $data->value( 'core_checksums' );
-		if ( is_array( $core_checksums ) && [] !== $core_checksums ) {
-			$rows[] = [ $data->label( 'core_checksums' ), esc_html( wp_json_encode( $core_checksums ) ) ];
+		if ( is_array( $core_checksums ) ) {
+			$rows[] = [ $data->label( 'core_checksums' ), $this->format_structured( $core_checksums ) ];
 		} else {
 			$rows[] = [ $data->label( 'core_checksums' ), esc_html__( '—', 'rtcamp-amc-copilot' ) ];
 		}
 		// config_checks (list) rendered below if applicable.
 		$config_checks = $data->value( 'config_checks' );
-		if ( is_array( $config_checks ) && [] !== $config_checks ) {
-			$rows[] = [ $data->label( 'config_checks' ), esc_html( wp_json_encode( $config_checks ) ) ];
+		if ( is_array( $config_checks ) ) {
+			$rows[] = [ $data->label( 'config_checks' ), $this->format_structured( $config_checks ) ];
 		} else {
 			$rows[] = [ $data->label( 'config_checks' ), esc_html__( '—', 'rtcamp-amc-copilot' ) ];
 		}

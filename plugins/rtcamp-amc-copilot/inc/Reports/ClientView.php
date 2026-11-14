@@ -90,10 +90,24 @@ final class ClientView implements Registrable {
 		 */
 		$assets = Main::get_instance()->get_shared( Assets::class );
 
+		if ( $assets->has_asset( 'css/report-view', 'css' ) ) {
+			$assets->register_style( 'amc-report-view', 'css/report-view' );
+			wp_enqueue_style( 'amc-report-view' );
+		}
+
 		if ( $assets->has_asset( 'css/report-print', 'css' ) ) {
 			$assets->register_style( 'amc-report-print', 'css/report-print' );
 			wp_enqueue_style( 'amc-report-print' );
 		}
+
+		// "Download PDF": the browser's print dialog saves an A4 PDF named after
+		// the report ID (the dialog proposes document.title as the file name).
+		wp_register_script( 'amc-report-view', false, [], AMC_COPILOT_VERSION, true );
+		wp_enqueue_script( 'amc-report-view' );
+		wp_add_inline_script(
+			'amc-report-view',
+			'document.addEventListener("click",function(e){var b=e.target.closest("[data-amc-download]");if(!b){return;}var t=document.title;document.title=b.getAttribute("data-amc-download");window.print();setTimeout(function(){document.title=t;},1000);});'
+		);
 
 		add_filter(
 			'admin_body_class',
@@ -274,7 +288,7 @@ final class ClientView implements Registrable {
 	}
 
 	/**
-	 * One report, read only.
+	 * One report, read only, laid out as a client-ready document.
 	 *
 	 * @param WP_Post $post Report.
 	 */
@@ -287,7 +301,7 @@ final class ClientView implements Registrable {
 		 * @param string  $html Rendered blocks.
 		 * @param WP_Post $post Report.
 		 */
-		$body = (string) apply_filters( 'amc_report_view_content', do_blocks( $post->post_content ), $post );
+		$body = (string) apply_filters( 'amc_report_view_content', self::render_blocks( $post ), $post );
 
 		/**
 		 * Filters the rtCamp logo URL shown at the top of every report.
@@ -296,25 +310,87 @@ final class ClientView implements Registrable {
 		 */
 		$logo = (string) apply_filters( 'amc_report_logo_url', plugins_url( 'assets/images/rtcamp-logo.svg', AMC_COPILOT_FILE ) );
 
-		echo '<div class="wrap amc-report-view"><img src="' . esc_url( $logo ) . '" alt="rtCamp" width="96" height="32" class="amc-report-logo">';
-		echo '<h1 class="wp-heading-inline">' . esc_html( get_the_title( $post ) ) . '</h1>';
-		echo '<a href="' . esc_url( $list ) . '" class="page-title-action">' . esc_html__( 'All reports', 'rtcamp-amc-copilot' ) . '</a>';
+		$snapshot  = SnapshotSchema::for_post( $post->ID );
+		$site_name = (string) ( $snapshot['site']['name'] ?? get_bloginfo( 'name' ) );
+		$site_url  = (string) ( $snapshot['site']['url'] ?? home_url() );
+		$report_id = (string) get_post_meta( $post->ID, '_amc_report_id', true );
+		$author    = get_the_author_meta( 'display_name', (int) $post->post_author );
+		$file_name = sanitize_file_name( '' !== $report_id ? $report_id : get_the_title( $post ) );
+		$facts     = array_filter(
+			[
+				__( 'Period', 'rtcamp-amc-copilot' )      => self::period_text( $post->ID ),
+				__( 'Report ID', 'rtcamp-amc-copilot' )   => $report_id,
+				__( 'Prepared by', 'rtcamp-amc-copilot' ) => (string) $author,
+				__( 'Issued', 'rtcamp-amc-copilot' )      => (string) get_the_date( '', $post ),
+			]
+		);
 
-		if ( 'publish' !== $post->post_status ) {
-			echo '<span class="amc-report-status"> ' . esc_html__( '(draft preview)', 'rtcamp-amc-copilot' ) . '</span>';
+		echo '<div class="wrap amc-report-view">';
+
+		echo '<div class="amc-report-toolbar amc-no-print">';
+		echo '<a href="' . esc_url( $list ) . '" class="button">' . esc_html__( 'All reports', 'rtcamp-amc-copilot' ) . '</a>';
+		if ( current_user_can( 'edit_post', $post->ID ) ) {
+			echo ' <a href="' . esc_url( (string) get_edit_post_link( $post->ID ) ) . '" class="button">' . esc_html__( 'Edit report', 'rtcamp-amc-copilot' ) . '</a>';
 		}
+		echo ' <button type="button" class="button button-primary" data-amc-download="' . esc_attr( $file_name ) . '">' . esc_html__( 'Download PDF', 'rtcamp-amc-copilot' ) . '</button>';
 
 		/**
-		 * Fires in the report page header (add a print button here).
+		 * Fires in the report toolbar (screen only, not printed).
 		 *
 		 * @param WP_Post $post Report.
 		 */
 		do_action( 'amc_report_view_toolbar', $post );
 
-		echo '<hr class="wp-header-end"><p class="description">' . esc_html( self::period_text( $post->ID ) ) . '</p>';
+		echo '<p class="description">' . esc_html__( 'In the print dialog, choose “Save as PDF”.', 'rtcamp-amc-copilot' ) . '</p>';
+		echo '</div>';
+
+		if ( 'publish' !== $post->post_status ) {
+			echo '<div class="notice notice-warning inline amc-no-print"><p>' . esc_html__( 'Draft preview: clients cannot see this report until it is published.', 'rtcamp-amc-copilot' ) . '</p></div>';
+		}
+
+		echo '<hr class="wp-header-end">';
+
+		echo '<article class="amc-report-document" id="amc-report-' . (int) $post->ID . '">';
+		echo '<header class="amc-report-cover">';
+		echo '<div class="amc-report-cover__brand"><img src="' . esc_url( $logo ) . '" alt="rtCamp" width="96" height="32" class="amc-report-logo"><span class="amc-report-cover__kind">' . esc_html__( 'Website Maintenance Report', 'rtcamp-amc-copilot' ) . '</span></div>';
+		echo '<h1 class="amc-report-cover__title">' . esc_html( get_the_title( $post ) ) . '</h1>';
+		echo '<p class="amc-report-cover__site">' . esc_html( $site_name ) . ' · <a href="' . esc_url( $site_url ) . '">' . esc_html( (string) wp_parse_url( $site_url, PHP_URL_HOST ) ) . '</a></p>';
+		echo '<dl class="amc-report-cover__facts">';
+		foreach ( $facts as $label => $value ) {
+			echo '<div><dt>' . esc_html( $label ) . '</dt><dd>' . esc_html( $value ) . '</dd></div>';
+		}
+		echo '</dl></header>';
 
 		// Block output is escaped by each block's render callback; this is rendered post content.
-		echo '<div class="amc-report" id="amc-report-' . (int) $post->ID . '">' . $body . '</div></div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		echo '<div class="amc-report">' . $body . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+
+		echo '<footer class="amc-report-footer">';
+		/* translators: %s: site name. */
+		echo '<p>' . esc_html( sprintf( __( 'Prepared by rtCamp for %s. Confidential.', 'rtcamp-amc-copilot' ), $site_name ) . ( '' !== $report_id ? ' ' . $report_id : '' ) ) . '</p>';
+		echo '</footer></article></div>';
+	}
+
+	/**
+	 * Render the report's blocks with the report as their post context.
+	 *
+	 * The view is an admin page, so there is no global post: without the
+	 * context every section block would read an empty snapshot.
+	 *
+	 * @param WP_Post $post Report.
+	 */
+	private static function render_blocks( WP_Post $post ): string {
+		$context = static function ( array $context ) use ( $post ): array {
+			$context['postId']   = $post->ID;
+			$context['postType'] = $post->post_type;
+
+			return $context;
+		};
+
+		add_filter( 'render_block_context', $context );
+		$html = do_blocks( $post->post_content );
+		remove_filter( 'render_block_context', $context );
+
+		return $html;
 	}
 
 	/**
@@ -330,7 +406,9 @@ final class ClientView implements Registrable {
 			return '';
 		}
 
+		$format = (string) get_option( 'date_format' );
+
 		/* translators: 1: period start date, 2: period end date. */
-		return sprintf( __( '%1$s to %2$s', 'rtcamp-amc-copilot' ), $start, $end );
+		return sprintf( __( '%1$s to %2$s', 'rtcamp-amc-copilot' ), mysql2date( $format, $start ), mysql2date( $format, $end ) );
 	}
 }

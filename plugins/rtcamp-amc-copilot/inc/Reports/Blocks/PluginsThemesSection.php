@@ -33,36 +33,36 @@ final class PluginsThemesSection extends AbstractSectionBlock {
 
 		// counts (object) rendered below if applicable.
 		$counts = $data->value( 'counts' );
-		if ( is_array( $counts ) && [] !== $counts ) {
-			$rows[] = [ $data->label( 'counts' ), esc_html( wp_json_encode( $counts ) ) ];
+		if ( is_array( $counts ) ) {
+			$rows[] = [ $data->label( 'counts' ), $this->format_structured( $counts ) ];
 		} else {
 			$rows[] = [ $data->label( 'counts' ), esc_html__( '—', 'rtcamp-amc-copilot' ) ];
 		}
 		// updated (list) rendered below if applicable.
 		$updated = $data->value( 'updated' );
-		if ( is_array( $updated ) && [] !== $updated ) {
-			$rows[] = [ $data->label( 'updated' ), esc_html( wp_json_encode( $updated ) ) ];
+		if ( is_array( $updated ) ) {
+			$rows[] = [ $data->label( 'updated' ), $this->format_structured( $updated ) ];
 		} else {
 			$rows[] = [ $data->label( 'updated' ), esc_html__( '—', 'rtcamp-amc-copilot' ) ];
 		}
 		// added (list) rendered below if applicable.
 		$added = $data->value( 'added' );
-		if ( is_array( $added ) && [] !== $added ) {
-			$rows[] = [ $data->label( 'added' ), esc_html( wp_json_encode( $added ) ) ];
+		if ( is_array( $added ) ) {
+			$rows[] = [ $data->label( 'added' ), $this->format_structured( $added ) ];
 		} else {
 			$rows[] = [ $data->label( 'added' ), esc_html__( '—', 'rtcamp-amc-copilot' ) ];
 		}
 		// removed (list) rendered below if applicable.
 		$removed = $data->value( 'removed' );
-		if ( is_array( $removed ) && [] !== $removed ) {
-			$rows[] = [ $data->label( 'removed' ), esc_html( wp_json_encode( $removed ) ) ];
+		if ( is_array( $removed ) ) {
+			$rows[] = [ $data->label( 'removed' ), $this->format_structured( $removed ) ];
 		} else {
 			$rows[] = [ $data->label( 'removed' ), esc_html__( '—', 'rtcamp-amc-copilot' ) ];
 		}
 		// inactive (list) rendered below if applicable.
 		$inactive = $data->value( 'inactive' );
-		if ( is_array( $inactive ) && [] !== $inactive ) {
-			$rows[] = [ $data->label( 'inactive' ), esc_html( wp_json_encode( $inactive ) ) ];
+		if ( is_array( $inactive ) ) {
+			$rows[] = [ $data->label( 'inactive' ), $this->format_structured( $inactive ) ];
 		} else {
 			$rows[] = [ $data->label( 'inactive' ), esc_html__( '—', 'rtcamp-amc-copilot' ) ];
 		}

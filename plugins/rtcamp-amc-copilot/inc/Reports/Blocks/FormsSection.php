@@ -33,16 +33,16 @@ final class FormsSection extends AbstractSectionBlock {
 
 		// form_plugins (list) rendered below if applicable.
 		$form_plugins = $data->value( 'form_plugins' );
-		if ( is_array( $form_plugins ) && [] !== $form_plugins ) {
-			$rows[] = [ $data->label( 'form_plugins' ), esc_html( wp_json_encode( $form_plugins ) ) ];
+		if ( is_array( $form_plugins ) ) {
+			$rows[] = [ $data->label( 'form_plugins' ), $this->format_structured( $form_plugins ) ];
 		} else {
 			$rows[] = [ $data->label( 'form_plugins' ), esc_html__( '—', 'rtcamp-amc-copilot' ) ];
 		}
 		$rows[] = [ $data->label( 'sending_method' ), $this->format_value( $data->value( 'sending_method' ), $data->type( 'sending_method' ) ) ];
 		// integrations (list) rendered below if applicable.
 		$integrations = $data->value( 'integrations' );
-		if ( is_array( $integrations ) && [] !== $integrations ) {
-			$rows[] = [ $data->label( 'integrations' ), esc_html( wp_json_encode( $integrations ) ) ];
+		if ( is_array( $integrations ) ) {
+			$rows[] = [ $data->label( 'integrations' ), $this->format_structured( $integrations ) ];
 		} else {
 			$rows[] = [ $data->label( 'integrations' ), esc_html__( '—', 'rtcamp-amc-copilot' ) ];
 		}
