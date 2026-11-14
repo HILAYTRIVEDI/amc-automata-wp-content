@@ -45,12 +45,14 @@ final class SslCertificateTest extends TestCase {
 	/**
 	 * Fake: the certificate is `days` days from expiry.
 	 *
-	 * @param int    $days   Days left.
-	 * @param string $serial Serial number.
+	 * @param int      $days   Days left.
+	 * @param string   $serial Serial number.
+	 * @param int|null $now    Reference time; the Runner reads the real clock,
+	 *                         so tests that go through it pass time().
 	 */
-	private function cert_with( int $days, string $serial = '0A1B2C' ): void {
+	private function cert_with( int $days, string $serial = '0A1B2C', ?int $now = null ): void {
 		$build      = $this->fixture( 'ssl-certificate/certs' );
-		$this->read = [ 'parsed' => $build( $this->now(), $days, $serial ) ];
+		$this->read = [ 'parsed' => $build( $now ?? $this->now(), $days, $serial ) ];
 	}
 
 	/**
@@ -210,7 +212,7 @@ final class SslCertificateTest extends TestCase {
 		$runner = new Runner();
 		$repo   = new FindingsRepository();
 
-		$this->cert_with( 10, 'AAA111' );
+		$this->cert_with( 10, 'AAA111', time() );
 		$runner->run( 'ssl.certificate' );
 		$this->assertCount( 1, $processed[0]->new );
 		$this->assertSame( 10, $processed[0]->new[0]['data']['days_left'] );
@@ -225,7 +227,7 @@ final class SslCertificateTest extends TestCase {
 		$this->assertArrayHasKey( 'ssl:AAA111', $repo->unresolved_for_check( 'ssl.certificate' ) );
 
 		// Renewed: a new serial and 90 days.
-		$this->cert_with( 90, 'BBB222' );
+		$this->cert_with( 90, 'BBB222', time() );
 		$runner->run( 'ssl.certificate' );
 		$this->assertCount( 1, $processed[3]->resolved );
 		$this->assertSame( 'ssl:AAA111', $processed[3]->resolved[0]['dedupe_key'] );
