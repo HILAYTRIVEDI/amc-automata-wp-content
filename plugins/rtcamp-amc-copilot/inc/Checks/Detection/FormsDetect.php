@@ -14,6 +14,7 @@ use AMC\Checks\Context;
 use AMC\Checks\Group;
 use AMC\Checks\Result;
 use AMC\Checks\Schedule;
+use AMC\Support\AdminFunctions;
 use AMC\Support\PluginDetect;
 
 /**
@@ -63,7 +64,7 @@ final class FormsDetect implements Check {
 	 * @param callable|null $count_source   Test seam; default a best-effort counter.
 	 */
 	public function __construct( ?callable $plugins_source = null, ?callable $active_source = null, ?callable $count_source = null ) {
-		$this->plugins_source = $plugins_source ?? static fn (): array => function_exists( 'get_plugins' ) ? get_plugins() : [];
+		$this->plugins_source = $plugins_source ?? static fn (): array => AdminFunctions::ensure( 'get_plugins' ) ? get_plugins() : [];
 		$this->active_source  = $active_source ?? static fn (): array => (array) get_option( 'active_plugins', [] );
 		$this->count_source   = $count_source ?? static fn ( ?string $plugin ): ?int => null; // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found
 	}

@@ -16,6 +16,7 @@ use AMC\Checks\Group;
 use AMC\Checks\Result;
 use AMC\Checks\Schedule;
 use AMC\Checks\Severity;
+use AMC\Support\AdminFunctions;
 
 /**
  * Class ThemeUpdates
@@ -107,7 +108,7 @@ final class ThemeUpdates implements Check {
 			'template'   => (string) get_option( 'template' ),
 		];
 		$this->api_source     = $api_source ?? static function ( string $slug ): mixed {
-			if ( ! function_exists( 'themes_api' ) ) {
+			if ( ! AdminFunctions::ensure( 'themes_api' ) ) {
 				return false;
 			}
 

@@ -129,8 +129,18 @@ final class ConfigCheck implements Check {
 		];
 
 		if ( $counts['fail'] > 0 ) {
-			/* translators: 1: Number of failed checks, 2: Number of warnings. */
-			return Result::fail( sprintf( __( '%1$d security settings need fixing and %2$d need a look.', 'rtcamp-amc-copilot' ), $counts['fail'], $counts['warn'] ), $data, $findings );
+			/* translators: %d: Number of failed checks. */
+			$summary = sprintf( _n( '%d security setting needs fixing.', '%d security settings need fixing.', $counts['fail'], 'rtcamp-amc-copilot' ), $counts['fail'] );
+
+			if ( $counts['warn'] > 0 ) {
+				$summary .= ' ' . sprintf(
+					/* translators: %d: Number of warnings. */
+					_n( '%d more needs a look.', '%d more need a look.', $counts['warn'], 'rtcamp-amc-copilot' ),
+					$counts['warn']
+				);
+			}
+
+			return Result::fail( $summary, $data, $findings );
 		}
 
 		if ( $counts['warn'] > 0 ) {

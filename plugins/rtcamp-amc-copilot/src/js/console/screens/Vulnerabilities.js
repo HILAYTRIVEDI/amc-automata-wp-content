@@ -25,6 +25,7 @@ import {
 	runField,
 	textField,
 } from '../utils/fields';
+import { providerNotice } from '../utils/providerNotice';
 
 const severityElements = () => [
 	{ value: 'critical', label: __( 'Critical', 'rtcamp-amc-copilot' ) },
@@ -260,13 +261,9 @@ export default function Vulnerabilities() {
 			{ notice.node }
 			{ data && (
 				<>
-					{ ( ! data.provider.ready || data.provider.last_error ) && (
+					{ providerNotice( data.provider ) && (
 						<Notice status="warning" isDismissible={ false }>
-							{ data.provider.last_error ||
-								__(
-									'The CVE provider is not ready, so no vulnerability data is being matched.',
-									'rtcamp-amc-copilot'
-								) }
+							{ providerNotice( data.provider ) }
 						</Notice>
 					) }
 					<DataTable

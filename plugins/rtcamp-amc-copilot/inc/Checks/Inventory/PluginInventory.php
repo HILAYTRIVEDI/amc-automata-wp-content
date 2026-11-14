@@ -18,6 +18,7 @@ use AMC\Checks\Result;
 use AMC\Checks\Schedule;
 use AMC\Checks\Severity;
 use AMC\Storage\SnapshotsRepository;
+use AMC\Support\AdminFunctions;
 
 /**
  * Class PluginInventory
@@ -96,16 +97,11 @@ final class PluginInventory implements Check {
 		?callable $api_source = null,
 		?SnapshotsRepository $snapshots = null
 	) {
-		$this->plugins_source = $plugins_source ?? static fn (): array => function_exists( 'get_plugins' ) ? get_plugins() : [];
+		$this->plugins_source = $plugins_source ?? static fn (): array => AdminFunctions::ensure( 'get_plugins' ) ? get_plugins() : [];
 		$this->active_source  = $active_source ?? static fn (): array => (array) get_option( 'active_plugins', [] );
 		$this->network_source = $network_source ?? static fn (): array => array_keys( (array) get_site_option( 'active_sitewide_plugins', [] ) );
 		$this->api_source     = $api_source ?? static function ( string $slug ): mixed {
-			if ( ! function_exists( 'plugins_api' ) && defined( 'ABSPATH' ) ) {
-				// Not loaded outside wp-admin (cron, WP-CLI).
-				require_once ABSPATH . 'wp-admin/includes/plugin-install.php';
-			}
-
-			if ( ! function_exists( 'plugins_api' ) ) {
+			if ( ! AdminFunctions::ensure( 'plugins_api' ) ) {
 				return false;
 			}
 
