@@ -1,11 +1,47 @@
+/**
+ * Report print / "Save as PDF".
+ *
+ * Margin boxes are styled explicitly: they do not inherit the page font, and
+ * declaring the top boxes replaces the browser's own date/title header.
+ */
+
 @page {
 	size: a4;
-	margin: 18mm 15mm 20mm;
+	margin: 18mm 16mm 18mm;
 
-	@bottom-center {
-		content: "Page " counter( page ) " of " counter( pages );
-		font-size: 9pt;
-		color: currentcolor;
+	@top-left {
+		content: "rtCamp  \00B7  Website Maintenance Report";
+		font-family: "Reddit Sans", -apple-system, "Helvetica Neue", sans-serif;
+		font-size: 7.5pt;
+		letter-spacing: 0.08em;
+		color: #949494;
+	}
+
+	@top-right {
+		content: "Confidential";
+		font-family: "Reddit Sans", -apple-system, "Helvetica Neue", sans-serif;
+		font-size: 7.5pt;
+		letter-spacing: 0.08em;
+		color: #949494;
+	}
+
+	@bottom-right {
+		content: counter(page) " / " counter(pages);
+		font-family: "Reddit Mono", ui-monospace, menlo, monospace;
+		font-size: 7.5pt;
+		color: #949494;
+	}
+}
+
+// The cover page carries its own masthead.
+@page :first {
+
+	@top-left {
+		content: none;
+	}
+
+	@top-right {
+		content: none;
 	}
 }
 
@@ -22,10 +58,13 @@
 
 @media print {
 
-	.amc-report-logo {
-		display: block;
-		break-after: avoid;
-		margin-bottom: 4mm;
+	html,
+	body,
+	#wpwrap,
+	#wpcontent,
+	#wpbody,
+	#wpbody-content {
+		background: #fff !important;
 	}
 
 	.amc-report-page {
@@ -43,42 +82,51 @@
 		#wpcontent,
 		#wpbody-content {
 			margin-inline-start: 0 !important;
-			padding-inline-start: 0 !important;
+			padding: 0 !important;
+		}
+
+		.wrap {
+			margin: 0 !important;
 		}
 	}
 
-	.amc-section {
-		break-inside: avoid;
+	// Sections flow across pages (no half-empty pages); only headings,
+	// rows and small blocks are kept whole.
+	.amc-report-cover {
 		break-inside: avoid;
 	}
 
+	// Never strand a heading at the foot of a page: break-after alone is not
+	// honoured reliably by Chrome, so the heading also reserves room for the
+	// first rows below it (the negative margin gives the space back).
 	.amc-section > .wp-block-heading,
 	.amc-section > h2 {
 		break-after: avoid;
-		break-after: avoid;
-	}
-
-	.amc-section figure.wp-block-table tr:first-child {
-		break-before: avoid;
-		break-before: avoid;
-	}
-
-	.amc-section figure.wp-block-table tr {
 		break-inside: avoid;
-		break-inside: avoid;
+
+		&::after {
+			content: "";
+			display: block;
+			height: 32mm;
+			margin-bottom: -32mm;
+		}
 	}
 
+	.amc-section tr,
+	.amc-section .amc-kv-list,
+	.amc-section .amc-subtable,
+	.amc-disclaimer,
 	.amc-trend-chart {
 		break-inside: avoid;
+	}
+
+	.amc-section p {
+		orphans: 3;
+		widows: 3;
 	}
 
 	.amc-edited-badge,
 	.amc-override-control {
 		display: none !important;
-	}
-
-	.amc-disclaimer {
-		font-size: 9pt;
-		font-style: italic;
 	}
 }

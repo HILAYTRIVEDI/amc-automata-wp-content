@@ -9,6 +9,8 @@ declare( strict_types = 1 );
 
 namespace AMC\Notify;
 
+use AMC\Core\Brand;
+
 /**
  * Class EmailRenderer
  *
@@ -25,18 +27,20 @@ namespace AMC\Notify;
  *   action_url:   string
  *   action_label: string
  *
- * The HTML is a few inline-styled tables in the colours of the WordPress
- * admin (no brand design, no external assets), so every mail client renders it.
+ * The HTML is a few inline-styled tables in rtCamp's brand colours (see
+ * AMC\Core\Brand) with no external assets, so every mail client renders it.
+ * Clients without Reddit Sans fall back to the system font stack.
  *
  * @since 0.1.0
  */
 final class EmailRenderer {
 
-	private const TEXT   = '#1d2327';
-	private const MUTED  = '#50575e';
-	private const BORDER = '#c3c4c7';
-	private const BG     = '#f0f0f1';
-	private const LINK   = '#2271b1';
+	private const TEXT   = Brand::INK;
+	private const MUTED  = Brand::MUTED;
+	private const BORDER = Brand::RULE;
+	private const BG     = Brand::CREAM;
+	private const LINK   = Brand::INK;
+	private const ACCENT = Brand::RED;
 
 	/**
 	 * Render both parts.
@@ -101,9 +105,12 @@ final class EmailRenderer {
 	 * @param array<string, mixed> $email Email content.
 	 */
 	public static function html( array $email ): string {
-		$cell = 'padding:12px 20px;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;font-size:14px;line-height:1.5;color:' . self::TEXT . ';';
+		$cell = 'padding:12px 24px;font-family:' . str_replace( '"', '\'', Brand::FONT_STACK ) . ';font-size:14px;line-height:1.55;color:' . self::TEXT . ';';
 
-		$body = '<tr><td style="' . $cell . '"><h1 style="margin:0;font-size:20px;line-height:1.3;color:' . self::TEXT . ';">' . esc_html( (string) ( $email['heading'] ?? '' ) ) . '</h1></td></tr>';
+		$body = '<tr><td style="' . $cell . 'padding-top:20px;font-size:13px;font-weight:600;color:' . self::MUTED . ';">'
+			// The brand name keeps its own casing; only the product label is set as an eyebrow.
+			. '<span style="color:' . self::ACCENT . ';font-size:15px;">rtCamp</span> &middot; <span style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;">' . esc_html__( 'AMC Copilot', 'rtcamp-amc-copilot' ) . '</span></td></tr>';
+		$body .= '<tr><td style="' . $cell . '"><h1 style="margin:0;font-size:22px;font-weight:600;line-height:1.3;color:' . self::TEXT . ';">' . esc_html( (string) ( $email['heading'] ?? '' ) ) . '</h1></td></tr>';
 
 		if ( ! empty( $email['intro'] ) ) {
 			$body .= '<tr><td style="' . $cell . 'color:' . self::MUTED . ';">' . esc_html( (string) $email['intro'] ) . '</td></tr>';
@@ -139,7 +146,7 @@ final class EmailRenderer {
 		}
 
 		if ( ! empty( $email['action_url'] ) ) {
-			$body .= '<tr><td style="' . $cell . '"><a href="' . esc_url( (string) $email['action_url'] ) . '" style="display:inline-block;padding:8px 16px;background:' . self::LINK . ';color:#ffffff;text-decoration:none;border-radius:3px;font-size:14px;">'
+			$body .= '<tr><td style="' . $cell . '"><a href="' . esc_url( (string) $email['action_url'] ) . '" style="display:inline-block;padding:10px 20px;background:' . self::LINK . ';color:#ffffff;text-decoration:none;border-radius:4px;font-size:14px;font-weight:600;">'
 				. esc_html( (string) ( $email['action_label'] ?? __( 'Open', 'rtcamp-amc-copilot' ) ) ) . '</a></td></tr>';
 		}
 
@@ -153,7 +160,7 @@ final class EmailRenderer {
 		$html = '<!DOCTYPE html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /></head>'
 			. '<body style="margin:0;padding:0;background:' . self::BG . ';">'
 			. '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:' . self::BG . ';"><tr><td align="center" style="padding:20px 10px;">'
-			. '<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#ffffff;border:1px solid ' . self::BORDER . ';">'
+			. '<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#ffffff;border:1px solid ' . self::BORDER . ';border-top:4px solid ' . self::ACCENT . ';">'
 			. $body
 			. '</table></td></tr></table></body></html>';
 

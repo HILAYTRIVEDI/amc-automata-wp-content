@@ -10,6 +10,7 @@ declare( strict_types = 1 );
 namespace AMC\Admin;
 
 use AMC\Core\Assets;
+use AMC\Core\Brand;
 use AMC\Core\Capabilities;
 use AMC\Main;
 use rtCamp\WPPrimitives\AssetLoader;
@@ -82,6 +83,8 @@ final class ConsoleAssets implements Registrable {
 		}
 
 		$loader->register_script( self::HANDLE, 'js/console' );
+
+		Brand::enqueue_fonts();
 
 		if ( $loader->has_asset( 'css/console', 'css' ) ) {
 			$loader->register_style( self::HANDLE, 'css/console', [ 'wp-components' ] );
