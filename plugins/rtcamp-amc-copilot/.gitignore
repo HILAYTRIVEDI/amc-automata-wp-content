@@ -43,6 +43,9 @@ assets/build/
 /coverage/
 .phpunit.cache/
 
+# Performance harness output (k6 JSON summaries).
+/tests/performance/results/
+
 # Graphify knowledge graph: track the queryable graph + report, ignore the rest.
 /graphify-out/*
 !/graphify-out/graph.json
