@@ -125,9 +125,9 @@ Phase 1 ships 31 checks in 11 groups. "Immediate" in the alert column means an e
 | `ssl.certificate` | Peer certificate via `stream_socket_client` with `capture_peer_cert`: issuer, expiry | Daily | Immediate (14 days or less) |
 | `perf.response` | Server response time of smoke URLs | Hourly | Digest (20% slower than 4-week average) |
 | `perf.database` | Table sizes from `information_schema`, autoloaded options size, transients count | Daily | Digest (autoload over 800 KB) |
-| `perf.cache` | Persistent object cache, page cache headers (Site Health tests) | Daily | None |
+| `perf.cache` | `WP_Site_Health` `get_test_persistent_object_cache()` and `get_test_page_cache()` (status, label, response time); page cache headers and `advanced-cache.php` from core's page cache detail | Daily | None |
 | `perf.slow_queries` | Sampled queries over 100 ms, grouped by caller | Hourly | Digest |
-| `health.site_health` | `WP_Site_Health` direct tests | Daily | Digest (critical results) |
+| `health.site_health` | `WP_Site_Health` tests run server-side as core's own cron check does (direct tests, plus async tests that have a direct runner; `skip_cron` tests and `page_cache` skipped). Critical results are Medium findings, recommended results Low | Daily | Digest (critical and recommended results) |
 | `health.cron` | `_get_cron_array()` overdue events | Hourly | Digest (overdue over 1 h) |
 | `users.roles` | `count_users()`, role and capability snapshot diff | Daily | Digest (capability changes) |
 | `users.changes` | `user_register`, `delete_user`, `set_user_role` hooks | Event | None |

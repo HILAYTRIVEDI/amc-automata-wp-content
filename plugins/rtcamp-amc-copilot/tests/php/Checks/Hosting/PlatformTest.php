@@ -14,6 +14,7 @@ use AMC\Checks\Group;
 use AMC\Checks\Hosting\Platform;
 use AMC\Checks\Schedule;
 use AMC\Checks\Status;
+use AMC\Support\HostDetect;
 use AMC\Tests\TestCase;
 
 /**
@@ -89,18 +90,57 @@ final class PlatformTest extends TestCase {
 	}
 
 	/**
-	 * Reveals a bug in the default constants collector.
+	 * Build a check whose DEFAULT constants collector reads from a fake map.
 	 *
-	 * Documents a bug; remove the mark once the seam is aligned.
+	 * @param array<string, mixed> $defined Constants the fake environment defines.
+	 * @param list<string>         $asked   Receives every constant name the collector asks for.
 	 */
-	public function test_kinsta_is_detected_through_the_default_constants_seam(): void {
-		$result = $this->check( null, [], null )->run( Context::for_tests() );
+	private function check_with_fake_constants( array $defined, array &$asked ): Platform {
+		return new Platform(
+			null,
+			static fn (): array => [],
+			static fn (): ?string => null,
+			static function ( string $name ) use ( $defined, &$asked ): ?array {
+				$asked[] = $name;
 
-		$this->markTestIncomplete(
-			'bug: the default constants seam collects KINSTA_CACHE_ZONE / PRESSABLE_CACHE_ZONE / IS_VIP, '
-			. 'but HostDetect maps KINSTAMU_VERSION / IS_PRESSABLE / WPCOM_IS_VIP_ENV, so Kinsta, Pressable '
-			. 'and VIP are never detected by the default seam. Detected host was: '
-			. ( $result->data['host'] ?? 'null' ) . '.'
+				return array_key_exists( $name, $defined ) ? [ $defined[ $name ] ] : null;
+			}
 		);
+	}
+
+	public function test_the_default_collector_asks_for_exactly_the_constants_host_detect_maps(): void {
+		$asked = [];
+
+		$this->check_with_fake_constants( [], $asked )->run( Context::for_tests() );
+
+		$this->assertSame( HostDetect::constant_names(), $asked );
+	}
+
+	/**
+	 * @return array<string, array{0: string, 1: mixed, 2: string}>
+	 */
+	public function host_constants(): array {
+		return [
+			'VIP (platform constant)' => [ 'WPCOM_IS_VIP_ENV', true, 'wpcom-vip' ],
+			'VIP Go environment'      => [ 'VIP_GO_APP_ENVIRONMENT', 'production', 'wpcom-vip' ],
+			'Kinsta'                  => [ 'KINSTAMU_VERSION', '2.4.0', 'kinsta' ],
+			'Pressable'               => [ 'IS_PRESSABLE', true, 'pressable' ],
+			'WP Engine'               => [ 'WPE_APIKEY', 'secret', 'wpengine' ],
+			'Pantheon'                => [ 'PANTHEON_ENVIRONMENT', 'live', 'pantheon' ],
+		];
+	}
+
+	/**
+	 * @dataProvider host_constants
+	 *
+	 * @param string $constant Constant the host defines.
+	 * @param mixed  $value    Its value.
+	 * @param string $expected Expected platform slug.
+	 */
+	public function test_every_host_is_detected_through_the_default_constants_collector( string $constant, $value, string $expected ): void {
+		$asked  = [];
+		$result = $this->check_with_fake_constants( [ $constant => $value ], $asked )->run( Context::for_tests() );
+
+		$this->assertSame( $expected, $result->data['host'] );
 	}
 }

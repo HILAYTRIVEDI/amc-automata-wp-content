@@ -66,13 +66,16 @@ final class Platform implements Check {
 	 * @param callable|null $constants_source Test seam; default collects defined constants.
 	 * @param callable|null $server_source    Test seam; default selected $_SERVER keys.
 	 * @param callable|null $db_source        Test seam; default $wpdb->db_version().
+	 * @param callable|null $constant_reader  Test seam for the default collector: fn( string $name ): ?array{0: mixed}, null when undefined.
 	 */
-	public function __construct( ?callable $constants_source = null, ?callable $server_source = null, ?callable $db_source = null ) {
-		$this->constants_source = $constants_source ?? static function (): array {
+	public function __construct( ?callable $constants_source = null, ?callable $server_source = null, ?callable $db_source = null, ?callable $constant_reader = null ) {
+		$reader                 = $constant_reader ?? static fn ( string $name ): ?array => defined( $name ) ? [ constant( $name ) ] : null;
+		$this->constants_source = $constants_source ?? static function () use ( $reader ): array {
 			$out = [];
-			foreach ( [ 'IS_VIP', 'WPE_APIKEY', 'PWP_NAME', 'KINSTA_CACHE_ZONE', 'PRESSABLE_CACHE_ZONE', 'PANTHEON_ENVIRONMENT' ] as $name ) {
-				if ( defined( $name ) ) {
-					$out[ $name ] = constant( $name );
+			foreach ( HostDetect::constant_names() as $name ) {
+				$found = $reader( $name );
+				if ( null !== $found ) {
+					$out[ $name ] = $found[0];
 				}
 			}
 

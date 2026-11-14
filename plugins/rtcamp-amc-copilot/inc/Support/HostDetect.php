@@ -59,6 +59,18 @@ final class HostDetect {
 	private function __construct() {}
 
 	/**
+	 * Names of every constant the platform detection looks at.
+	 *
+	 * Callers that collect constants for {@see self::platform()} must use this
+	 * list so the collector and the detector cannot drift apart.
+	 *
+	 * @return list<string>
+	 */
+	public static function constant_names(): array {
+		return array_keys( self::HOST_CONSTANTS );
+	}
+
+	/**
 	 * Detects the hosting platform and web server software.
 	 *
 	 * All matching markers are collected as evidence lines even though the

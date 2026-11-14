@@ -72,9 +72,12 @@ final class MailerDetect implements Check {
 				return 0;
 			}
 
-			return is_countable( $wp_filter['phpmailer_init']->callbacks ?? [] )
-				? count( $wp_filter['phpmailer_init']->callbacks )
-				: 0;
+			$count = 0;
+			foreach ( (array) ( $wp_filter['phpmailer_init']->callbacks ?? [] ) as $callbacks ) {
+				$count += is_countable( $callbacks ) ? count( $callbacks ) : 0;
+			}
+
+			return $count;
 		};
 	}
 

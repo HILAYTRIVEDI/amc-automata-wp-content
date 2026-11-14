@@ -18,6 +18,17 @@ use PHPUnit\Framework\TestCase;
 final class HostDetectTest extends TestCase {
 
 	/**
+	 * Lists every marker constant the detector reads, including VIP, Kinsta and Pressable.
+	 */
+	public function test_constant_names_lists_every_marker(): void {
+		$names = HostDetect::constant_names();
+
+		foreach ( [ 'WPCOM_IS_VIP_ENV', 'VIP_GO_APP_ENVIRONMENT', 'WPE_APIKEY', 'PWP_NAME', 'PANTHEON_ENVIRONMENT', 'KINSTAMU_VERSION', 'IS_PRESSABLE' ] as $name ) {
+			$this->assertContains( $name, $names );
+		}
+	}
+
+	/**
 	 * Detects WordPress VIP from its environment constants.
 	 */
 	public function test_detects_wordpress_vip(): void {

@@ -28,6 +28,7 @@ use AMC\Storage\SnapshotsRepository;
  *
  * Result::$data shape (consumed by the Inventory screen and report CMS section):
  *   plugins list<array{file, name, version, active, network_active, wp_org, closed, last_updated, abandoned}>
+ *     (a closed plugin is wp_org true and closed true; last_updated is null for it)
  *   total int, active int, network_active int, closed int, abandoned int
  *   changes array{added, removed, updated} since the previous snapshot
  *
@@ -61,7 +62,8 @@ final class PluginInventory implements Check {
 	private $network_source;
 
 	/**
-	 * Returns wp.org plugin information for a slug, or false/WP_Error.
+	 * Returns wp.org plugin information for a slug: an object, a WP_Error (the
+	 * message is "closed" for a closed plugin), or false when unavailable.
 	 *
 	 * @var callable(string): mixed
 	 */
@@ -94,6 +96,11 @@ final class PluginInventory implements Check {
 		$this->active_source  = $active_source ?? static fn (): array => (array) get_option( 'active_plugins', [] );
 		$this->network_source = $network_source ?? static fn (): array => array_keys( (array) get_site_option( 'active_sitewide_plugins', [] ) );
 		$this->api_source     = $api_source ?? static function ( string $slug ): mixed {
+			if ( ! function_exists( 'plugins_api' ) && defined( 'ABSPATH' ) ) {
+				// Not loaded outside wp-admin (cron, WP-CLI).
+				require_once ABSPATH . 'wp-admin/includes/plugin-install.php';
+			}
+
 			if ( ! function_exists( 'plugins_api' ) ) {
 				return false;
 			}
@@ -150,18 +157,21 @@ final class PluginInventory implements Check {
 			$meta          = is_array( $meta ) ? $meta : [];
 			$slug          = self::slug( (string) $file );
 			$info          = ( $this->api_source )( $slug );
-			$wp_org        = is_object( $info );
+			$wp_org        = false;
 			$closed_plugin = false;
 			$last_updated  = null;
 
-			if ( $wp_org ) {
-				$last_updated = isset( $info->last_updated ) && is_string( $info->last_updated ) ? $info->last_updated : null;
-				if ( is_array( $info->versions ?? null ) && [] === $info->versions ) {
+			if ( is_wp_error( $info ) ) {
+				// A closed plugin is still on wp.org: the API answers {"error":"closed"} and
+				// plugins_api() turns that into a WP_Error whose message is "closed". Any
+				// other error ("Plugin not found.", a network failure) tells us nothing.
+				if ( 'closed' === $info->get_error_message() ) {
+					$wp_org        = true;
 					$closed_plugin = true;
 				}
-			} else {
-				// Not found on wp.org at all: treat as non-wp.org (no finding).
-				$wp_org = false;
+			} elseif ( is_object( $info ) ) {
+				$wp_org       = true;
+				$last_updated = isset( $info->last_updated ) && is_string( $info->last_updated ) ? $info->last_updated : null;
 			}
 
 			$abandoned_plugin = false;
