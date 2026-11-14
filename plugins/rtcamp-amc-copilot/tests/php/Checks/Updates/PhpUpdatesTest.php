@@ -73,6 +73,32 @@ final class PhpUpdatesTest extends TestCase {
 		$this->assertSame( [], $result->data['blocking_plugins'] );
 	}
 
+	public function test_default_source_works_without_wp_admin_includes(): void {
+		// Cron does not load wp-admin/includes/misc.php; the check must load it
+		// itself rather than report "no data". The cached Serve Happy answer
+		// avoids a network call.
+		set_site_transient(
+			'php_check_' . md5( PHP_VERSION ),
+			[
+				'recommended_version'          => '8.3',
+				'minimum_version'              => '7.4',
+				'is_supported'                 => true,
+				'is_secure'                    => true,
+				'is_acceptable'                => true,
+				'is_lower_than_future_minimum' => false,
+			],
+			HOUR_IN_SECONDS
+		);
+
+		$result = ( new PhpUpdates( null, null, static fn (): array => [], static fn (): array => [] ) )->run( Context::for_tests() );
+
+		delete_site_transient( 'php_check_' . md5( PHP_VERSION ) );
+
+		$this->assertTrue( function_exists( 'wp_check_php_version' ) );
+		$this->assertSame( Status::PASS, $result->status );
+		$this->assertSame( '8.3', $result->data['recommended'] );
+	}
+
 	public function test_acceptable_passes(): void {
 		$result = $this->check_with( 'acceptable', '8.3.0' )->run( Context::for_tests() );
 

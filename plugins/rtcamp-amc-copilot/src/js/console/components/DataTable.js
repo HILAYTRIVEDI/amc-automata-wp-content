@@ -94,10 +94,14 @@ export default function DataTable( {
 
 	// DataViews renders a bare `<table>` with no caption or name, so name it
 	// after every render (the element is replaced when the view changes).
+	// It also gets the core list table classes, so it reads like every other
+	// admin list (borders, header, striped rows).
 	useEffect( () => {
-		wrapper.current
-			?.querySelector( 'table.dataviews-view-table' )
-			?.setAttribute( 'aria-label', tableLabel );
+		const table = wrapper.current?.querySelector(
+			'table.dataviews-view-table'
+		);
+		table?.setAttribute( 'aria-label', tableLabel );
+		table?.classList.add( 'widefat', 'striped' );
 	} );
 
 	const exportCsv = () => {

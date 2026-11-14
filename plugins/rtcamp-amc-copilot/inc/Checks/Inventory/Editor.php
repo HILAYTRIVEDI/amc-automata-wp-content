@@ -14,6 +14,7 @@ use AMC\Checks\Context;
 use AMC\Checks\Group;
 use AMC\Checks\Result;
 use AMC\Checks\Schedule;
+use AMC\Support\AdminFunctions;
 
 /**
  * Class Editor
@@ -62,7 +63,7 @@ final class Editor implements Check {
 	 * @param callable|null $editor_source  Test seam; default use_block_editor_for_post_type() per public type.
 	 */
 	public function __construct( ?callable $plugins_source = null, ?callable $active_source = null, ?callable $editor_source = null ) {
-		$this->plugins_source = $plugins_source ?? static fn (): array => function_exists( 'get_plugins' ) ? get_plugins() : [];
+		$this->plugins_source = $plugins_source ?? static fn (): array => AdminFunctions::ensure( 'get_plugins' ) ? get_plugins() : [];
 		$this->active_source  = $active_source ?? static fn (): array => (array) get_option( 'active_plugins', [] );
 		$this->editor_source  = $editor_source ?? static function (): array {
 			if ( ! function_exists( 'get_post_types' ) ) {

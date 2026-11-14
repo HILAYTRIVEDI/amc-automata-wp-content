@@ -21,7 +21,8 @@ use rtCamp\WPPrimitives\Contracts\Interfaces\Registrable;
  * transport (throttling is not applied to these, they are one per report).
  *
  *   draft_ready( $post_id )   to the engineers on the recipient list
- *   published( $post_id )     to client administrators (setting
+ *   published( $post_id )     to the `report_publish_recipients` setting
+ *                             PLUS client administrators (setting
  *                             `notify_client_on_publish`, on by default)
  *
  * Both return `{ subject, text, html, recipients }`. Subjects start with
@@ -37,6 +38,14 @@ use rtCamp\WPPrimitives\Contracts\Interfaces\Registrable;
  * published() here. When they do not exist nothing is sent, and A2 can hook
  * the same two actions itself.
  *
+ * The "published" email goes out once per report: on its FIRST publish. The
+ * meta key `_amc_published_email_sent` (a Unix timestamp) is added as a lock
+ * before sending and removed again only when nothing could be sent (nobody to
+ * send to, kill switch, mail failure), so a later re-publish can still try.
+ * Updates to a published report never send (ReportPublishing only fires
+ * `amc_report_published` on the transition into `publish`), and unpublishing
+ * and re-publishing a report that was already emailed does not send again.
+ *
  * @since 0.1.0
  */
 final class ReportEmails implements Registrable {
@@ -45,6 +54,11 @@ final class ReportEmails implements Registrable {
 	 * Mailer class lane A2 provides.
 	 */
 	public const MAILER = 'AMC\\Notify\\Mailer';
+
+	/**
+	 * Post meta set once the "published" email has gone out.
+	 */
+	public const SENT_META = '_amc_published_email_sent';
 
 	/**
 	 * {@inheritDoc}
@@ -64,12 +78,20 @@ final class ReportEmails implements Registrable {
 	}
 
 	/**
-	 * Hand the "report published" email to the Mailer, when lane A2 has merged.
+	 * Hand the "report published" email to the Mailer, once per report.
 	 *
 	 * @param int $post_id Report ID.
 	 */
 	public function on_published( int $post_id ): void {
-		self::call_mailer( 'send_report_published', $post_id );
+		// add_post_meta( unique ) is the lock: a second publish event for the
+		// same report (or a concurrent request) cannot add it again.
+		if ( ! add_post_meta( $post_id, self::SENT_META, time(), true ) ) {
+			return;
+		}
+
+		if ( ! self::call_mailer( 'send_report_published', $post_id ) ) {
+			delete_post_meta( $post_id, self::SENT_META );
+		}
 	}
 
 	/**
@@ -117,7 +139,7 @@ final class ReportEmails implements Registrable {
 			__( 'A new website maintenance report has been published and is available under Maintenance Reports in your WordPress admin.', 'rtcamp-amc-copilot' ),
 			__( 'Read the report', 'rtcamp-amc-copilot' ),
 			ClientView::view_url( $post_id, false ),
-			self::client_recipients()
+			self::published_recipients()
 		);
 
 		/**
@@ -130,7 +152,29 @@ final class ReportEmails implements Registrable {
 	}
 
 	/**
-	 * Who gets the "published" email: administrators who can read reports and
+	 * Everyone who gets the "published" email: the addresses in the
+	 * `report_publish_recipients` setting (always), plus the client
+	 * administrators when `notify_client_on_publish` is on. Deduplicated
+	 * case-insensitively.
+	 *
+	 * @return list<string> Email addresses.
+	 */
+	public static function published_recipients(): array {
+		$emails = [];
+
+		foreach ( array_merge( (array) Settings::get_value( 'report_publish_recipients' ), self::client_recipients() ) as $email ) {
+			$email = (string) $email;
+
+			if ( is_email( $email ) ) {
+				$emails[ strtolower( $email ) ] ??= $email;
+			}
+		}
+
+		return array_values( $emails );
+	}
+
+	/**
+	 * Client administrators who get the "published" email: administrators who can read reports and
 	 * are not engineers, and only when the site setting is on.
 	 *
 	 * @return list<string> Email addresses.
@@ -202,12 +246,16 @@ final class ReportEmails implements Registrable {
 	 *
 	 * @param string $method  Method name.
 	 * @param int    $post_id Report ID.
+	 *
+	 * @return bool Whether the Mailer reported a send.
 	 */
-	private static function call_mailer( string $method, int $post_id ): void {
+	private static function call_mailer( string $method, int $post_id ): bool {
 		$callable = [ self::MAILER, $method ];
 
 		if ( class_exists( self::MAILER ) && is_callable( $callable ) ) {
-			$callable( $post_id );
+			return (bool) $callable( $post_id );
 		}
+
+		return false;
 	}
 }

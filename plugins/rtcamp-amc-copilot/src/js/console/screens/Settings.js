@@ -37,6 +37,34 @@ import { navigate, screenUrl } from '../utils/navigation';
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
+ * Most addresses the "Report recipients" field takes (matches
+ * Settings::MAX_REPORT_PUBLISH_RECIPIENTS on the server).
+ */
+const MAX_REPORT_RECIPIENTS = 25;
+
+/**
+ * Split a textarea of email addresses (new lines, commas or semicolons) into
+ * trimmed, non-empty entries, without case-insensitive duplicates.
+ *
+ * @param {string} text Raw textarea value.
+ * @return {string[]} Addresses.
+ */
+const splitAddresses = ( text ) => {
+	const seen = new Set();
+	return text
+		.split( /[\n,;]+/ )
+		.map( ( value ) => value.trim() )
+		.filter( ( value ) => {
+			const key = value.toLowerCase();
+			if ( ! value || seen.has( key ) ) {
+				return false;
+			}
+			seen.add( key );
+			return true;
+		} );
+};
+
+/**
  * Help text for a field with a validation error: the error comes first and is
  * bold with an "Error:" prefix (so it is not conveyed by emphasis alone), then
  * the field's normal help. `TextControl` and `TextareaControl` link `help` to
@@ -497,6 +525,7 @@ export default function Settings() {
 	const notice = useNotice();
 	const [ form, setForm ] = useState( null );
 	const [ recipientsText, setRecipientsText ] = useState( '' );
+	const [ reportRecipientsText, setReportRecipientsText ] = useState( '' );
 	const [ password, setPassword ] = useState( '' );
 	const [ overrides, setOverrides ] = useState( {} );
 	const [ saving, setSaving ] = useState( false );
@@ -508,12 +537,16 @@ export default function Settings() {
 	const pendingFocus = useRef( null );
 	const tabsRef = useRef( null );
 	const recipientsRef = useRef( null );
+	const reportRecipientsRef = useRef( null );
 	const digestTimeRef = useRef( null );
 
 	useEffect( () => {
 		if ( data ) {
 			setForm( data );
 			setRecipientsText( data.recipients.join( '\n' ) );
+			setReportRecipientsText(
+				( data.report_publish_recipients ?? [] ).join( '\n' )
+			);
 			setOverrides( data.checks );
 		}
 	}, [ data ] );
@@ -669,10 +702,7 @@ export default function Settings() {
 	);
 
 	const save = async () => {
-		const recipients = recipientsText
-			.split( /[\n,;]+/ )
-			.map( ( value ) => value.trim() )
-			.filter( Boolean );
+		const recipients = splitAddresses( recipientsText );
 		const badAddress = recipients.find(
 			( value ) => ! EMAIL.test( value )
 		);
@@ -688,6 +718,38 @@ export default function Settings() {
 			setErrors( { recipients: message } );
 			notice.error( message );
 			focusField( recipientsRef );
+			return;
+		}
+		const reportRecipients = splitAddresses( reportRecipientsText );
+		const badReportAddress = reportRecipients.find(
+			( value ) => ! EMAIL.test( value )
+		);
+		if ( badReportAddress ) {
+			const message = sprintf(
+				/* translators: %s: email address. */
+				__(
+					'"%s" is not a valid email address.',
+					'rtcamp-amc-copilot'
+				),
+				badReportAddress
+			);
+			setErrors( { report_publish_recipients: message } );
+			notice.error( message );
+			focusField( reportRecipientsRef );
+			return;
+		}
+		if ( reportRecipients.length > MAX_REPORT_RECIPIENTS ) {
+			const message = sprintf(
+				/* translators: %d: maximum number of addresses. */
+				__(
+					'Enter at most %d report recipients.',
+					'rtcamp-amc-copilot'
+				),
+				MAX_REPORT_RECIPIENTS
+			);
+			setErrors( { report_publish_recipients: message } );
+			notice.error( message );
+			focusField( reportRecipientsRef );
 			return;
 		}
 		if ( ! /^\d{2}:\d{2}$/.test( form.digest_time ) ) {
@@ -728,6 +790,7 @@ export default function Settings() {
 					form.immediate_alerts_per_hour
 				),
 				notify_client_on_publish: form.notify_client_on_publish,
+				report_publish_recipients: reportRecipients,
 				loopback_auth: {
 					username: form.loopback_auth.username,
 					...( password ? { password } : {} ),
@@ -740,9 +803,19 @@ export default function Settings() {
 			setForm( saved );
 			setOverrides( saved.checks );
 			setRecipientsText( saved.recipients.join( '\n' ) );
+			setReportRecipientsText(
+				( saved.report_publish_recipients ?? [] ).join( '\n' )
+			);
 			setPassword( '' );
 			notice.success( __( 'Settings saved.', 'rtcamp-amc-copilot' ) );
 		} catch ( err ) {
+			if (
+				'amc_invalid_email' === err.code ||
+				'amc_too_many_recipients' === err.code
+			) {
+				setErrors( { report_publish_recipients: err.message } );
+				focusField( reportRecipientsRef );
+			}
 			notice.error( err.message );
 		} finally {
 			setSaving( false );
@@ -934,6 +1007,39 @@ export default function Settings() {
 						checked={ !! form.notify_client_on_publish }
 						onChange={ set( 'notify_client_on_publish' ) }
 					/>
+					<Row
+						id="amc-setting-report-recipients"
+						label={ __(
+							'Report recipients',
+							'rtcamp-amc-copilot'
+						) }
+						help={ sprintf(
+							/* translators: %d: maximum number of addresses. */
+							__(
+								'Email these addresses when a report is first published, one per line or separated by commas (at most %d). They are emailed even when client emails are off; client administrators are added when they are on.',
+								'rtcamp-amc-copilot'
+							),
+							MAX_REPORT_RECIPIENTS
+						) }
+						error={ errors.report_publish_recipients }
+					>
+						<textarea
+							id="amc-setting-report-recipients"
+							className="large-text code"
+							rows={ 4 }
+							value={ reportRecipientsText }
+							ref={ reportRecipientsRef }
+							aria-invalid={ !! errors.report_publish_recipients }
+							aria-describedby="amc-setting-report-recipients-description"
+							onChange={ ( event ) => {
+								setErrors( ( current ) => ( {
+									...current,
+									report_publish_recipients: undefined,
+								} ) );
+								setReportRecipientsText( event.target.value );
+							} }
+						/>
+					</Row>
 				</tbody>
 			</table>
 

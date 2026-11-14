@@ -176,6 +176,8 @@ final class RoutesTest extends TestCase {
 		$this->assertSame( '1', $response->get_headers()['X-WP-Total'] );
 		$this->assertSame( 'updates.core', $response->get_data()[0]['check_id'] );
 		$this->assertMatchesRegularExpression( '/Z$/', $response->get_data()[0]['created_at'] );
+		$this->assertSame( 'updates', $response->get_data()[0]['group'] );
+		$this->assertSame( \AMC\Checks\Group::from( 'updates' )->label(), $response->get_data()[0]['group_label'], 'Runs carry a readable group name for the console' );
 	}
 
 	public function test_lane_b2_screens_are_no_longer_stubs(): void {

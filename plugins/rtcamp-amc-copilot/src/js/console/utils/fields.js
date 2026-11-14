@@ -77,7 +77,9 @@ export const dateField = ( id, label, options = {} ) => ( {
 	label,
 	type: 'datetime',
 	getValue: ( { item } ) => item[ id ] ?? '',
-	render: ( { item } ) => <span>{ formatDateTime( item[ id ] ) }</span>,
+	render: ( { item } ) => (
+		<span className="amc-nowrap">{ formatDateTime( item[ id ] ) }</span>
+	),
 	...options,
 } );
 

@@ -16,12 +16,16 @@ use AMC\Checks\Group;
 use AMC\Checks\Result;
 use AMC\Checks\Schedule;
 use AMC\Checks\Severity;
+use AMC\Support\AdminFunctions;
 
 /**
  * Class Readiness
  *
- * For every active plugin, compares its "Tested up to" header against the
- * next WordPress major (the branch after the installed version). Plugins
+ * For every active plugin, compares its "Tested up to" value against the
+ * next WordPress major (the branch after the installed version).
+ * `get_plugins()` does not parse "Tested up to", so the value is read from
+ * WordPress.org's update data for the installed version, then the plugin
+ * file header, then the plugin's readme.txt (see tested_up_to()). Plugins
  * that have not declared a tested-up-to value, or are below the next
  * major, are reported so an engineer can confirm compatibility before a
  * major upgrade.
@@ -67,20 +71,30 @@ final class Readiness implements Check {
 	private $active_source;
 
 	/**
+	 * Returns a plugin's "Tested up to" value, null when not declared.
+	 *
+	 * @var callable(string): ?string
+	 */
+	private $tested_source;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param callable|null $version_source Test seam; default wp_get_wp_version().
 	 * @param callable|null $plugins_source Test seam; default get_plugins().
 	 * @param callable|null $active_source  Test seam; default get_option( 'active_plugins' ).
+	 * @param callable|null $tested_source  Test seam; default self::tested_up_to().
 	 */
 	public function __construct(
 		?callable $version_source = null,
 		?callable $plugins_source = null,
-		?callable $active_source = null
+		?callable $active_source = null,
+		?callable $tested_source = null
 	) {
 		$this->version_source = $version_source ?? static fn (): string => function_exists( 'wp_get_wp_version' ) ? wp_get_wp_version() : '6.9.1';
-		$this->plugins_source = $plugins_source ?? static fn (): array => function_exists( 'get_plugins' ) ? get_plugins() : [];
+		$this->plugins_source = $plugins_source ?? static fn (): array => AdminFunctions::ensure( 'get_plugins' ) ? get_plugins() : [];
 		$this->active_source  = $active_source ?? static fn (): array => (array) get_option( 'active_plugins', [] );
+		$this->tested_source  = $tested_source ?? static fn ( string $file ): ?string => self::tested_up_to( $file );
 	}
 
 	/**
@@ -129,8 +143,8 @@ final class Readiness implements Check {
 
 		foreach ( $active as $file ) {
 			$meta     = is_array( $plugins[ $file ] ?? null ) ? $plugins[ $file ] : [];
-			$tested   = (string) ( $meta['Tested up to'] ?? '' );
-			$tested   = '' !== $tested ? $tested : null;
+			$tested   = trim( (string) ( $meta['Tested up to'] ?? '' ) );
+			$tested   = '' !== $tested ? $tested : ( $this->tested_source )( (string) $file );
 			$is_ready = null !== $tested && version_compare( $tested, $next_major, '>=' );
 
 			if ( $is_ready ) {
@@ -191,6 +205,53 @@ final class Readiness implements Check {
 			$data,
 			$findings
 		);
+	}
+
+	/**
+	 * A plugin's "Tested up to" value, or null when it declares none.
+	 *
+	 * Order: WordPress.org's update data for the installed version (the
+	 * `no_update` entry: a `response` entry describes the new version, not
+	 * the installed one), then the plugin file header, then readme.txt.
+	 *
+	 * @param string $file Plugin file relative to the plugins directory.
+	 */
+	public static function tested_up_to( string $file ): ?string {
+		$transient = get_site_transient( 'update_plugins' );
+		$no_update = is_object( $transient ) && is_array( $transient->no_update ?? null ) ? $transient->no_update : [];
+		$offer     = $no_update[ $file ] ?? null;
+		$tested    = is_object( $offer ) || is_array( $offer ) ? trim( (string) ( ( (object) $offer )->tested ?? '' ) ) : '';
+
+		if ( '' !== $tested ) {
+			return $tested;
+		}
+
+		if ( ! defined( 'WP_PLUGIN_DIR' ) || '' === $file || str_contains( $file, '..' ) ) {
+			return null;
+		}
+
+		$main   = WP_PLUGIN_DIR . '/' . $file;
+		$readme = dirname( $main ) . '/readme.txt';
+
+		foreach ( [ $main, $readme ] as $path ) {
+			// The readme check must stay inside a plugin folder, never the plugins root.
+			if ( $path === $readme && '.' === dirname( $file ) ) {
+				continue;
+			}
+
+			if ( ! is_readable( $path ) ) {
+				continue;
+			}
+
+			$headers = get_file_data( $path, [ 'tested' => 'Tested up to' ] );
+			$tested  = trim( (string) ( $headers['tested'] ?? '' ) );
+
+			if ( '' !== $tested ) {
+				return $tested;
+			}
+		}
+
+		return null;
 	}
 
 	/**

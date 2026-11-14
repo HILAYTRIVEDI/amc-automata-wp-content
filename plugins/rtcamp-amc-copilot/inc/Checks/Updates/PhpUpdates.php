@@ -16,6 +16,7 @@ use AMC\Checks\Group;
 use AMC\Checks\Result;
 use AMC\Checks\Schedule;
 use AMC\Checks\Severity;
+use AMC\Support\AdminFunctions;
 
 /**
  * Class PhpUpdates
@@ -93,13 +94,13 @@ final class PhpUpdates implements Check {
 	) {
 		$this->version_source = $version_source ?? static fn (): string => (string) phpversion();
 		$this->check_source   = $check_source ?? static function (): mixed {
-			if ( ! function_exists( 'wp_check_php_version' ) ) {
+			if ( ! AdminFunctions::ensure( 'wp_check_php_version' ) ) {
 				return null;
 			}
 
 			return wp_check_php_version();
 		};
-		$this->plugins_source = $plugins_source ?? static fn (): array => function_exists( 'get_plugins' ) ? get_plugins() : [];
+		$this->plugins_source = $plugins_source ?? static fn (): array => AdminFunctions::ensure( 'get_plugins' ) ? get_plugins() : [];
 		$this->active_source  = $active_source ?? static fn (): array => (array) get_option( 'active_plugins', [] );
 	}
 
@@ -185,7 +186,7 @@ final class PhpUpdates implements Check {
 				);
 			}
 
-			return Result::info( __( 'WordPress has not fetched PHP version data yet.', 'rtcamp-amc-copilot' ), $data );
+			return Result::info( __( 'PHP version data from WordPress.org is not available yet.', 'rtcamp-amc-copilot' ), $data );
 		}
 
 		$data['recommended']               = self::string_or_null( $response['recommended_version'] ?? null );

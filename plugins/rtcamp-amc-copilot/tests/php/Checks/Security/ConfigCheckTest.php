@@ -101,6 +101,33 @@ final class ConfigCheckTest extends TestCase {
 		$this->assertStringContainsString( 'DISALLOW_FILE_EDIT', $by_key['config:disallow_file_edit']->data['detail'] );
 	}
 
+	public function test_fail_summary_is_singular_for_one_setting_and_mentions_warnings(): void {
+		$result = $this->run_with(
+			$this->facts(
+				[
+					'disallow_file_edit' => false,
+					'xmlrpc_enabled'     => true,
+				]
+			)
+		);
+
+		$this->assertSame( Status::FAIL, $result->status );
+		$this->assertSame( '1 security setting needs fixing. 1 more needs a look.', $result->summary );
+	}
+
+	public function test_fail_summary_without_warnings_does_not_mention_zero_warnings(): void {
+		$result = $this->run_with(
+			$this->facts(
+				[
+					'disallow_file_edit' => false,
+					'uploads_listing'    => true,
+				]
+			)
+		);
+
+		$this->assertSame( '2 security settings need fixing.', $result->summary );
+	}
+
 	public function test_only_warnings_warn(): void {
 		$this->assertSame( Status::WARN, $this->run_with( $this->facts( [ 'xmlrpc_enabled' => true ] ) )->status );
 	}
