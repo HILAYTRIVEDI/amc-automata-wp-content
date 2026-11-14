@@ -20,6 +20,7 @@ use WP_UnitTestCase;
  *   (created once in tests/bootstrap.php).
  * - Hooks added in a test are removed after it (WP_UnitTestCase backs them up).
  * - Settings start from defaults in every test.
+ * - Mail is sent from a valid address, whatever the test site's host.
  *
  * @since 0.1.0
  */
@@ -32,6 +33,11 @@ abstract class TestCase extends WP_UnitTestCase {
 		parent::set_up();
 
 		delete_option( Settings::OPTION );
+
+		// wp_mail() defaults the sender to wordpress@<site host>. When the test
+		// site runs on a bare host such as "localhost", PHPMailer rejects that
+		// address and no mail reaches the mock mailbox, so give tests a valid one.
+		add_filter( 'wp_mail_from', static fn (): string => 'wordpress@example.org' );
 	}
 
 	/**
