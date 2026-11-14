@@ -33,8 +33,8 @@ final class SmokeChecksSection extends AbstractSectionBlock {
 
 		// urls (list) rendered below if applicable.
 		$urls = $data->value( 'urls' );
-		if ( is_array( $urls ) && [] !== $urls ) {
-			$rows[] = [ $data->label( 'urls' ), esc_html( wp_json_encode( $urls ) ) ];
+		if ( is_array( $urls ) ) {
+			$rows[] = [ $data->label( 'urls' ), $this->format_structured( $urls ) ];
 		} else {
 			$rows[] = [ $data->label( 'urls' ), esc_html__( '—', 'rtcamp-amc-copilot' ) ];
 		}

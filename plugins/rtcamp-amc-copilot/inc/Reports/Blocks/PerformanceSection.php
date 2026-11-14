@@ -66,8 +66,8 @@ final class PerformanceSection extends AbstractSectionBlock {
 		if ( [] === $trend ) {
 			$response_trend = $data->value( 'response_trend' );
 
-			if ( is_array( $response_trend ) && [] !== $response_trend ) {
-				$rows[] = [ $data->label( 'response_trend' ), esc_html( wp_json_encode( $response_trend ) ) ];
+			if ( is_array( $response_trend ) ) {
+				$rows[] = [ $data->label( 'response_trend' ), $this->format_structured( $response_trend ) ];
 			} else {
 				$rows[] = [ $data->label( 'response_trend' ), esc_html__( '—', 'rtcamp-amc-copilot' ) ];
 			}

@@ -36,8 +36,8 @@ final class PhpErrorsSection extends AbstractSectionBlock {
 		$rows[] = [ $data->label( 'deprecation_count' ), $this->format_value( $data->value( 'deprecation_count' ), $data->type( 'deprecation_count' ) ) ];
 		// top_signatures (list) rendered below if applicable.
 		$top_signatures = $data->value( 'top_signatures' );
-		if ( is_array( $top_signatures ) && [] !== $top_signatures ) {
-			$rows[] = [ $data->label( 'top_signatures' ), esc_html( wp_json_encode( $top_signatures ) ) ];
+		if ( is_array( $top_signatures ) ) {
+			$rows[] = [ $data->label( 'top_signatures' ), $this->format_structured( $top_signatures ) ];
 		} else {
 			$rows[] = [ $data->label( 'top_signatures' ), esc_html__( '—', 'rtcamp-amc-copilot' ) ];
 		}
