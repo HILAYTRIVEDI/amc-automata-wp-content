@@ -647,3 +647,95 @@
 	}
 }
 /* stylelint-enable selector-class-pattern */
+
+// Collapsible boxes (check panels): the title is a disclosure button and a
+// one-line subtitle (the result summary) stays visible when closed.
+.amc-postbox {
+
+	.amc-postbox-heading {
+		flex: 1;
+		min-width: 0;
+	}
+
+	&.is-collapsible .amc-postbox-heading {
+		padding: 8px 12px;
+	}
+
+	&.is-collapsible .postbox-header .hndle {
+		padding: 0;
+	}
+
+	.amc-postbox-toggle {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		margin: 0 0 0 -4px;
+		padding: 2px 4px;
+		border: 0;
+		border-radius: 2px;
+		background: none;
+		color: inherit;
+		font: inherit;
+		text-align: start;
+		cursor: pointer;
+
+		svg {
+			flex: none;
+			fill: currentcolor;
+		}
+
+		&:focus-visible {
+			outline: 2px solid var(--wp-admin-theme-color);
+			outline-offset: 1px;
+		}
+	}
+
+	.amc-postbox-subtitle {
+		margin: 2px 0 0 24px;
+		overflow: hidden;
+		color: brand.$muted;
+		font-size: 13px;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	&.is-closed .postbox-header {
+		border-bottom: 0;
+	}
+
+	&.is-closed .inside {
+		display: none;
+	}
+}
+
+.amc-panels-toggle {
+	display: flex;
+	justify-content: flex-end;
+	align-items: center;
+	gap: 4px;
+	margin: 0 0 8px;
+}
+
+// Run detail page.
+.amc-run-pager {
+	display: flex;
+	justify-content: space-between;
+	gap: 16px;
+	margin: 0 0 16px;
+}
+
+.amc-run-detail {
+
+	.amc-run-current td {
+		font-weight: 600;
+	}
+
+	.amc-run-error {
+		border-inline-start: 4px solid #d63638;
+	}
+
+	.amc-run-data .amc-postbox-actions {
+		display: flex;
+		gap: 8px;
+	}
+}

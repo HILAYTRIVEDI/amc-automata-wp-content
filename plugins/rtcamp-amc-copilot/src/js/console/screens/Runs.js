@@ -1,7 +1,7 @@
 /**
  * WordPress dependencies
  */
-import { Button, Modal, Spinner } from '@wordpress/components';
+import { Button, Notice } from '@wordpress/components';
 import { useCallback, useMemo } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 import { backup, seen } from '@wordpress/icons';
@@ -9,22 +9,16 @@ import { backup, seen } from '@wordpress/icons';
 /**
  * Internal dependencies
  */
-import { getRun, getRuns } from '../api';
+import { getRuns } from '../api';
 import DataTable from '../components/DataTable';
 import RunNowButton from '../components/RunNowButton';
-import ScreenState, { ErrorNotice } from '../components/ScreenState';
-import StatusBadge, {
-	severityLabel,
-	statusFromSeverity,
-} from '../components/StatusBadge';
+import ScreenState from '../components/ScreenState';
+import StatusBadge from '../components/StatusBadge';
 import useResource from '../hooks/useResource';
 import { dateField, enumField, numberField, textField } from '../utils/fields';
-import { formatDateTime, formatMs } from '../utils/format';
-import {
-	navigate,
-	useFocusHeadingOnClose,
-	useLocation,
-} from '../utils/navigation';
+import { formatMs } from '../utils/format';
+import { navigate, useLocation } from '../utils/navigation';
+import RunDetail from './RunDetail';
 
 const triggerElements = () => [
 	{ value: 'cron', label: __( 'Cron', 'rtcamp-amc-copilot' ) },
@@ -62,108 +56,36 @@ const RunStatus = ( { status } ) => (
 );
 
 /**
- * Modal with a run's raw data and findings (`GET /runs/{id}`).
- *
- * @param {Object}                          props
- * @param {number}                          props.runId   Run id.
- * @param {(...args: unknown[]) => unknown} props.onClose Close handler.
- * @return {Element} Modal.
- */
-function RunDataModal( { runId, onClose } ) {
-	const fetcher = useCallback( () => getRun( runId ), [ runId ] );
-	const { data: run, error, isLoading } = useResource( fetcher );
-
-	return (
-		<Modal
-			title={ sprintf(
-				/* translators: %d: run id. */
-				__( 'Run #%d', 'rtcamp-amc-copilot' ),
-				runId
-			) }
-			onRequestClose={ onClose }
-			size="large"
-		>
-			{ isLoading && ! run && (
-				<p role="status">
-					<Spinner />{ ' ' }
-					<span className="screen-reader-text">
-						{ __( 'Loading the run…', 'rtcamp-amc-copilot' ) }
-					</span>
-				</p>
-			) }
-			{ error && <ErrorNotice error={ error } /> }
-			{ run && (
-				<>
-					<p>
-						<RunStatus status={ run.status } />{ ' ' }
-						<strong>{ run.check_label }</strong> ({ run.check_id })
-					</p>
-					<p>{ run.summary }</p>
-					<p className="description">
-						{ sprintf(
-							/* translators: 1: trigger, 2: date and time, 3: duration. */
-							__(
-								'Trigger: %1$s. Started %2$s. Took %3$s.',
-								'rtcamp-amc-copilot'
-							),
-							run.trigger,
-							formatDateTime( run.started_at ?? run.created_at ),
-							formatMs( run.duration_ms )
-						) }
-					</p>
-					{ run.findings?.length > 0 && (
-						<>
-							<h2>
-								{ __(
-									'Findings from this run',
-									'rtcamp-amc-copilot'
-								) }
-							</h2>
-							<ul className="amc-list">
-								{ run.findings.map( ( finding ) => (
-									<li key={ finding.id }>
-										<StatusBadge
-											status={ statusFromSeverity(
-												finding.severity
-											) }
-											label={ severityLabel(
-												finding.severity
-											) }
-										/>{ ' ' }
-										{ finding.title }
-									</li>
-								) ) }
-							</ul>
-						</>
-					) }
-					<h2>{ __( 'Result data', 'rtcamp-amc-copilot' ) }</h2>
-					<pre
-						className="amc-json"
-						tabIndex={ 0 }
-						role="region"
-						aria-label={ __(
-							'Run data (JSON)',
-							'rtcamp-amc-copilot'
-						) }
-					>
-						{ JSON.stringify( run.data, null, 2 ) }
-					</pre>
-				</>
-			) }
-		</Modal>
-	);
-}
-
-/**
- * Runs screen (`GET /runs`): every run with trigger, duration, status and
- * the result's data. "Re-run" queues the same check again.
+ * Runs screen. With `run=<id>` it is that run's detail page (RunDetail);
+ * otherwise the run history (`GET /runs`), optionally limited to one check
+ * with `check=<check_id>`. "Re-run" queues the same check again.
  *
  * @return {Element} Screen.
  */
 export default function Runs() {
-	const { data, error, isLoading, reload } = useResource( getRuns );
-	const { run: runArg } = useLocation();
-	useFocusHeadingOnClose( !! runArg );
+	const { run: runArg, check } = useLocation();
+	const runId = Number.parseInt( runArg, 10 );
+
+	if ( runId > 0 ) {
+		return <RunDetail key={ runId } runId={ runId } />;
+	}
+
+	return <RunHistory check={ check } />;
+}
+
+/**
+ * Run history table.
+ *
+ * @param {Object} props
+ * @param {string} [props.check] Only this check's runs.
+ * @return {Element} Screen.
+ */
+function RunHistory( { check } ) {
+	const fetcher = useCallback(
+		() => getRuns( check ? { check_id: check } : {} ),
+		[ check ]
+	);
+	const { data, error, isLoading, reload } = useResource( fetcher );
 
 	const fields = useMemo(
 		() => [
@@ -174,7 +96,7 @@ export default function Runs() {
 						onClick={ () => navigate( 'runs', { run: item.id } ) }
 						aria-label={ sprintf(
 							/* translators: %d: run id. */
-							__( 'View data for run #%d', 'rtcamp-amc-copilot' ),
+							__( 'Open run #%d', 'rtcamp-amc-copilot' ),
 							item.id
 						) }
 					>
@@ -229,7 +151,7 @@ export default function Runs() {
 		() => [
 			{
 				id: 'view-data',
-				label: __( 'View data', 'rtcamp-amc-copilot' ),
+				label: __( 'Open run', 'rtcamp-amc-copilot' ),
 				icon: seen,
 				isPrimary: true,
 				callback: ( [ item ] ) => navigate( 'runs', { run: item.id } ),
@@ -273,6 +195,21 @@ export default function Runs() {
 			onRetry={ reload }
 			hasData={ !! data }
 		>
+			{ check && (
+				<Notice status="info" isDismissible={ false }>
+					{ sprintf(
+						/* translators: %s: check id. */
+						__(
+							'Showing the runs of %s only.',
+							'rtcamp-amc-copilot'
+						),
+						check
+					) }{ ' ' }
+					<Button variant="link" onClick={ () => navigate( 'runs' ) }>
+						{ __( 'Show all runs', 'rtcamp-amc-copilot' ) }
+					</Button>
+				</Notice>
+			) }
 			{ data && (
 				<DataTable
 					data={ data.items }
@@ -286,13 +223,6 @@ export default function Runs() {
 							.map( ( f ) => f.id )
 							.filter( ( id ) => 'check_id' !== id ),
 					} }
-				/>
-			) }
-			{ runArg && (
-				<RunDataModal
-					key={ runArg }
-					runId={ Number.parseInt( runArg, 10 ) }
-					onClose={ () => navigate( 'runs' ) }
 				/>
 			) }
 		</ScreenState>
