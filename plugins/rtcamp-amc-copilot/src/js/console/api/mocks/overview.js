@@ -60,6 +60,7 @@ export const buildOverview = ( runs, findings ) => {
 		status: 'error' === worst ? 'warn' : worst,
 		kill_switch: false,
 		findings_by_severity: open,
+		stale: [],
 		groups,
 		versions: {
 			wordpress: '6.9.1',

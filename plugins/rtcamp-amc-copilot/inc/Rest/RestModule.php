@@ -51,6 +51,8 @@ final class RestModule extends AbstractModule {
 			ReportsController::class,
 			// C (setup wizard).
 			SetupController::class,
+			// Multisite Network controller.
+			NetworkController::class,
 		];
 	}
 }

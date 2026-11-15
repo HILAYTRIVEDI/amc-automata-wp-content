@@ -83,6 +83,12 @@ final class ReportEmails implements Registrable {
 	 * @param int $post_id Report ID.
 	 */
 	public function on_published( int $post_id ): void {
+		$send_choice = get_post_meta( $post_id, '_amc_send_publish_email', true );
+		if ( '' !== $send_choice && ! (bool) $send_choice ) {
+			// Engineer opted out of sending email to client on publish.
+			return;
+		}
+
 		// add_post_meta( unique ) is the lock: a second publish event for the
 		// same report (or a concurrent request) cannot add it again.
 		if ( ! add_post_meta( $post_id, self::SENT_META, time(), true ) ) {
@@ -92,6 +98,22 @@ final class ReportEmails implements Registrable {
 		if ( ! self::call_mailer( 'send_report_published', $post_id ) ) {
 			delete_post_meta( $post_id, self::SENT_META );
 		}
+	}
+
+	/**
+	 * Manually send the published report email to client recipients (e.g. from Client View).
+	 *
+	 * @param int $post_id Report ID.
+	 * @return bool Whether the email was accepted by Mailer.
+	 */
+	public static function send_published_report( int $post_id ): bool {
+		$sent = self::call_mailer( 'send_report_published', $post_id );
+
+		if ( $sent ) {
+			update_post_meta( $post_id, self::SENT_META, time() );
+		}
+
+		return $sent;
 	}
 
 	/**

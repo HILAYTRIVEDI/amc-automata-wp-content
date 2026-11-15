@@ -12,6 +12,7 @@ namespace AMC\Rest;
 use AMC\Checks\Group;
 use AMC\Checks\Registry;
 use AMC\Core\KillSwitch;
+use AMC\Core\Settings;
 use AMC\Runner\Scheduler;
 use AMC\Storage\FindingsRepository;
 use AMC\Storage\RunsRepository;
@@ -50,9 +51,11 @@ final class OverviewController extends AbstractController {
 	 * GET /overview.
 	 *
 	 * {
-	 *   status: 'pass'|'warn'|'fail'|'info',   worst latest result across checks
+	 *   status: 'pass'|'warn'|'fail'|'info',   worst latest result across ENABLED, registered checks
 	 *   kill_switch: bool,
-	 *   findings_by_severity: { critical, high, medium, low, info },   open only
+	 *   findings_by_severity: { critical, high, medium, low, info },   open only, enabled checks only
+	 *   stale: list<{ check_id, label, last_run_at }>   enabled checks whose result is older than
+	 *          two intervals (the scheduler missed runs), oldest first
 	 *   groups: list<{ group, label, status: string|null, last_run_at: string|null, checks: int }>,
 	 *   versions: { WordPress, php, mysql, theme: { name, version, parent: {name, version}|null } },
 	 *   counts: { plugins, plugins_active, themes, pending_updates: { core, plugins, themes, total } },
@@ -62,13 +65,18 @@ final class OverviewController extends AbstractController {
 	public function get_overview(): WP_REST_Response {
 		$registry = new Registry();
 		$runs     = new RunsRepository();
-		$latest   = $runs->latest_per_check();
+
+		// A disabled or removed check never runs again, so its last result and
+		// open findings would otherwise hold the overview at that state forever.
+		$enabled = array_filter( $registry->all(), static fn ( string $id ): bool => Settings::check_enabled( $id ), ARRAY_FILTER_USE_KEY );
+		$latest  = array_intersect_key( $runs->latest_per_check(), $enabled );
 
 		return new WP_REST_Response(
 			[
 				'status'               => $this->overall_status( $latest ),
 				'kill_switch'          => KillSwitch::is_active(),
-				'findings_by_severity' => ( new FindingsRepository() )->open_counts_by_severity(),
+				'findings_by_severity' => ( new FindingsRepository() )->open_counts_by_severity( null, array_keys( $enabled ) ),
+				'stale'                => $this->stale( $enabled, $latest ),
 				'groups'               => $this->groups( $registry, $latest ),
 				'versions'             => $this->versions(),
 				'counts'               => $this->counts(),
@@ -204,6 +212,29 @@ final class OverviewController extends AbstractController {
 				'total'   => $core_pending + $plugins_pending + $themes_pending,
 			],
 		];
+	}
+
+	/**
+	 * Enabled checks whose latest result is stale.
+	 *
+	 * @param array<string, \AMC\Checks\Check>    $enabled Enabled checks, by id.
+	 * @param array<string, array<string, mixed>> $latest  Latest result row per check.
+	 *
+	 * @return list<array{check_id: string, label: string, last_run_at: string|null}>
+	 */
+	private function stale( array $enabled, array $latest ): array {
+		$times = array_map( static fn ( array $row ): int => (int) strtotime( (string) $row['created_at'] . ' UTC' ), $latest );
+		$items = [];
+
+		foreach ( array_keys( Scheduler::stale_checks( $enabled, $times, time() ) ) as $id ) {
+			$items[] = [
+				'check_id'    => $id,
+				'label'       => $enabled[ $id ]->label(),
+				'last_run_at' => self::iso( (string) $latest[ $id ]['created_at'] ),
+			];
+		}
+
+		return $items;
 	}
 
 	/**

@@ -194,24 +194,33 @@ final class FindingsRepository extends AbstractRepository {
 	/**
 	 * Open findings per severity (status 'open' only).
 	 *
-	 * @param int|null $blog_id Site.
+	 * @param int|null          $blog_id   Site.
+	 * @param list<string>|null $check_ids Only these checks (null: every check).
 	 *
 	 * @return array<string, int> severity => count, all five severities present.
 	 */
-	public function open_counts_by_severity( ?int $blog_id = null ): array {
+	public function open_counts_by_severity( ?int $blog_id = null, ?array $check_ids = null ): array {
 		global $wpdb;
 
+		$counts = array_fill_keys( [ 'critical', 'high', 'medium', 'low', 'info' ], 0 );
+
+		if ( [] === $check_ids ) {
+			return $counts;
+		}
+
+		$sql  = 'SELECT severity, COUNT(*) AS n FROM %i WHERE blog_id = %d AND status = %s';
+		$args = [ $this->table(), $this->blog_id( $blog_id ), self::STATUS_OPEN ];
+
+		if ( null !== $check_ids ) {
+			$sql .= ' AND check_id IN (' . implode( ', ', array_fill( 0, count( $check_ids ), '%s' ) ) . ')';
+			$args = array_merge( $args, array_values( $check_ids ) );
+		}
+
 		$rows = $wpdb->get_results(
-			$wpdb->prepare(
-				'SELECT severity, COUNT(*) AS n FROM %i WHERE blog_id = %d AND status = %s GROUP BY severity',
-				$this->table(),
-				$this->blog_id( $blog_id ),
-				self::STATUS_OPEN
-			),
+			$wpdb->prepare( $sql . ' GROUP BY severity', ...$args ), // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Built from placeholders only.
 			ARRAY_A
 		);
 
-		$counts = array_fill_keys( [ 'critical', 'high', 'medium', 'low', 'info' ], 0 );
 		foreach ( (array) $rows as $row ) {
 			$counts[ (string) $row['severity'] ] = (int) $row['n'];
 		}

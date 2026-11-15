@@ -517,6 +517,7 @@ final class Generator implements Registrable {
 		update_post_meta( $post_id, '_amc_snapshot', wp_slash( (string) wp_json_encode( $snapshot ) ) );
 		update_post_meta( $post_id, '_amc_snapshot_taken_at', (string) ( $snapshot['taken_at'] ?? '' ) );
 		update_post_meta( $post_id, '_amc_build_status', ReportPostType::BUILD_READY );
+		ReportIssues::update_post_issues( $post_id, $snapshot );
 	}
 
 	/**

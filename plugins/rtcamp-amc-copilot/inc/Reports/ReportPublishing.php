@@ -44,6 +44,30 @@ final class ReportPublishing implements Registrable {
 	public function register_hooks(): void {
 		add_action( 'transition_post_status', [ $this, 'on_transition' ], 10, 3 );
 		add_action( 'rest_api_init', [ $this, 'register_rest_field' ] );
+		add_filter( 'rest_pre_insert_' . ReportPostType::SLUG, [ $this, 'capture_send_email_meta' ], 10, 2 );
+	}
+
+	/**
+	 * Capture _amc_send_publish_email from REST requests before transition_post_status fires.
+	 *
+	 * @param \stdClass       $prepared_post Prepared post data.
+	 * @param WP_REST_Request $request       Request.
+	 * @return \stdClass
+	 */
+	public function capture_send_email_meta( \stdClass $prepared_post, WP_REST_Request $request ): \stdClass {
+		$post_id = (int) ( $prepared_post->ID ?? 0 );
+		if ( $post_id <= 0 ) {
+			return $prepared_post;
+		}
+
+		$meta = $request->get_param( 'meta' );
+		if ( is_array( $meta ) && array_key_exists( '_amc_send_publish_email', $meta ) ) {
+			update_post_meta( $post_id, '_amc_send_publish_email', (bool) $meta['_amc_send_publish_email'] );
+		} elseif ( $request->has_param( 'send_email' ) ) {
+			update_post_meta( $post_id, '_amc_send_publish_email', (bool) $request->get_param( 'send_email' ) );
+		}
+
+		return $prepared_post;
 	}
 
 	/**

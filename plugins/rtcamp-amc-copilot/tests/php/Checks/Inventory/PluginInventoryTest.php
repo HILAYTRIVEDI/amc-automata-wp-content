@@ -42,7 +42,8 @@ final class PluginInventoryTest extends TestCase {
 			fn (): array => $this->fixture( 'inventory-plugins/' . $plugins ),
 			static fn (): array => $active,
 			static fn (): array => $network,
-			static fn ( string $slug ): mixed => $api[ $slug ] ?? false
+			// What wordpress.org answers for a slug it does not host.
+			static fn ( string $slug ): mixed => $api[ $slug ] ?? new \WP_Error( 'plugins_api_failed', 'Plugin not found.' )
 		);
 	}
 
@@ -236,6 +237,7 @@ final class PluginInventoryTest extends TestCase {
 		$this->assertFalse( $result->data['plugins'][0]['wp_org'] );
 		$this->assertFalse( $result->data['plugins'][0]['closed'] );
 		$this->assertSame( Status::PASS, $result->status );
+		$this->assertFalse( $result->complete, 'no answer from wordpress.org: open closed/abandoned findings must not resolve' );
 	}
 
 	public function test_an_unavailable_api_is_treated_as_non_wp_org(): void {
@@ -255,6 +257,62 @@ final class PluginInventoryTest extends TestCase {
 
 		$this->assertFalse( $result->data['plugins'][0]['wp_org'] );
 		$this->assertSame( Status::PASS, $result->status );
+		$this->assertFalse( $result->complete, 'plugins_api() unavailable tells us nothing' );
+	}
+
+	public function test_a_network_failure_keeps_a_closed_finding_open(): void {
+		$files = [
+			'display-widgets/display-widgets.php' => [
+				'Name'    => 'Display Widgets',
+				'Version' => '2.6',
+			],
+		];
+		$check = static fn ( mixed $answer ): PluginInventory => new PluginInventory(
+			static fn (): array => $files,
+			static fn (): array => [],
+			static fn (): array => [],
+			static fn (): mixed => $answer
+		);
+
+		$closed = $check( new \WP_Error( 'plugins_api_failed', 'closed' ) )->run( Context::for_tests( null, self::NOW ) );
+		$this->assertTrue( $closed->complete );
+		$this->assertCount( 1, $closed->findings );
+
+		// plugins_api() wraps a transport failure with the HTTP error as the error data.
+		$offline = $check( new \WP_Error( 'plugins_api_failed', 'An unexpected error occurred.', 'cURL error 6: Could not resolve host' ) )->run( Context::for_tests( null, self::NOW ) );
+		$this->assertFalse( $offline->complete, 'a partial result resolves nothing, so the closed finding stays open and does not re-alert' );
+	}
+
+	public function test_every_lookup_answered_by_wordpress_org_is_complete(): void {
+		$result = $this->check_with( 'plugins-clean' )->run( Context::for_tests( null, self::NOW ) );
+
+		$this->assertTrue( $result->complete );
+	}
+
+	public function test_plugin_information_from_a_third_party_updater_is_not_wordpress_org(): void {
+		$check = new PluginInventory(
+			static fn (): array => [
+				'premium-tools/premium-tools.php' => [
+					'Name'    => 'Premium Tools',
+					'Version' => '2.1.0',
+				],
+			],
+			static fn (): array => [],
+			static fn (): array => [],
+			// A vendor updater answering the plugins_api filter: core marks it external.
+			static fn (): object => (object) [
+				'slug'         => 'premium-tools',
+				'last_updated' => '2020-01-01 10:00am GMT',
+				'external'     => true,
+			]
+		);
+
+		$result = $check->run( Context::for_tests( null, self::NOW ) );
+
+		$this->assertFalse( $result->data['plugins'][0]['wp_org'] );
+		$this->assertFalse( $result->data['plugins'][0]['abandoned'], 'abandonment is judged on wordpress.org data only' );
+		$this->assertSame( [], $result->findings );
+		$this->assertTrue( $result->complete );
 	}
 
 	/**

@@ -25,7 +25,7 @@ Optional `window.amcCopilot.mockLatency` (ms) and `pollInterval` (ms, default 25
 
 ## Routing
 
-`?page=amc-copilot&screen=<slug>` with no router library. Slugs: `overview updates vulnerabilities errors smoke security performance inventory changes runs reports settings`.
+`?page=amc-copilot&screen=<slug>` with no router library. Slugs: `overview updates vulnerabilities errors smoke security performance inventory changes runs reports settings help` (and the standalone `setup`). `help` is static (`screens/Help.js`, no REST calls): a searchable how-to for new engineers, shown as a grouped topic list beside one topic at a time; `&topic=<id>` opens a topic (unknown ids open "Start here"). The "Under the hood" group explains where data lives: the data paths, the seven tables, options and report meta, what each check reads (files, remote requests, WordPress data) and each screen's REST route; its check list mirrors BLUEPRINT section 4.3. When the report workflow changes, update its topics too.
 
 Extra query args:
 

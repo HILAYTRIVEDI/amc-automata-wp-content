@@ -49,22 +49,24 @@ use DateTimeZone;
  * perf.database run, as a size is a level, not a sum). A month with no
  * matching run holds null, never 0.
  *
- * Run data the builder reads (every key is optional; a missing one falls back
- * to a WordPress read, or null, which the schema allows). When a check lands
- * with different key names, adjust the pick() lists in the matching method:
+ * Run data the builder reads. These are the keys each check really writes
+ * (see the "Result::$data shape" docblock of each check);
+ * SnapshotBuilderTest seeds them by RUNNING the real checks, so a renamed key
+ * fails a test instead of emptying a report field. A missing run gives null
+ * (or a WordPress read where noted):
  *
- *   hosting.platform    host, server_type|os, web_server|server_software,
- *                       mysql_version|db_version, php_version, memory_limit
- *   detect.cdn          cdn|provider|name
- *   detect.forms        plugins[{name, slug, form_count, addons}], integrations[{name}|string]
- *   detect.mailer       method|sending_method|mailer
- *   detect.analytics    gtm_ids[], ga_ids[] (+ ga4_ids[], ua_ids[] merged in)
- *   detect.accessibility tool|third_party_tool, statement_page|statement_url
- *   perf.cache          page_cache, object_cache (string or bool)
- *   perf.database       database_size_bytes|total_size_bytes, autoload_size_bytes
- *   ssl.certificate     issuer, expires_at|valid_to (date or timestamp), days_left
- *   security.checksums  status, modified_files|modified (list)
- *   security.config     checks[{id, label, status}]
+ *   hosting.platform    host, os, web_server, db_version, php_version, memory_limit
+ *                       (each falls back to a WordPress read)
+ *   detect.cdn          provider
+ *   detect.forms        plugin (file), addons[{name}] (also the integrations), form_count
+ *   detect.mailer       plugin (file), active, phpmailer_init_callbacks
+ *   detect.analytics    gtm[], ga4[], ua[]
+ *   detect.accessibility tools[], statement_pages[{url}]
+ *   perf.cache          page_cache_hit, persistent_object_cache (falls back to a WordPress read)
+ *   perf.database       total_mb, autoload_kb (autoload falls back to a WordPress read)
+ *   ssl.certificate     issuer, valid_to (date or timestamp), days_left
+ *   security.checksums  found[{path, issue}] (modified files); the run status
+ *   security.config     items[{key, title, status}]
  *   smoke.urls          urls[{url, ok:bool | status:'pass'|'fail'|'loopback_blocked', response_ms|ms}]
  *   perf.response       avg_ms | urls[{response_ms|ms}]
  *   vuln.match          findings (FindingsRepository), data: name?, slug, reference, fixed_in
@@ -523,11 +525,23 @@ final class SnapshotBuilder {
 	private function caching_cdn(): array {
 		$cache = $this->latest_data( 'perf.cache' );
 		$cdn   = $this->latest_data( 'detect.cdn' );
+		$hit   = $cache['page_cache_hit'] ?? null;
+
+		$page_cache = null;
+		if ( is_bool( $hit ) ) {
+			$page_cache = $hit ? __( 'Detected', 'rtcamp-amc-copilot' ) : __( 'Not detected', 'rtcamp-amc-copilot' );
+		}
+
+		$object_cache = $this->facts->object_cache();
+		if ( is_bool( $cache['persistent_object_cache'] ?? null ) ) {
+			// Same wording as SiteFacts::object_cache(), the fallback when perf.cache never ran.
+			$object_cache = $cache['persistent_object_cache'] ? __( 'Persistent object cache', 'rtcamp-amc-copilot' ) : __( 'None', 'rtcamp-amc-copilot' );
+		}
 
 		return [
-			'page_cache'   => self::text( self::pick( $cache, [ 'page_cache' ] ) ),
-			'object_cache' => self::text( self::pick( $cache, [ 'object_cache' ] ) ) ?? $this->facts->object_cache(),
-			'cdn'          => self::text( self::pick( $cdn, [ 'cdn', 'provider', 'name' ] ) ),
+			'page_cache'   => $page_cache,
+			'object_cache' => $object_cache,
+			'cdn'          => self::text( $cdn['provider'] ?? null ),
 		];
 	}
 
@@ -543,26 +557,32 @@ final class SnapshotBuilder {
 		$checksums     = null;
 
 		if ( null !== $checksums_run ) {
-			$data      = (array) $checksums_run['data'];
-			$modified  = self::pick( $data, [ 'modified_files', 'modified' ] );
+			// `found` lists every problem file; `modified` is only their count.
+			$modified = [];
+			foreach ( (array) ( ( (array) $checksums_run['data'] )['found'] ?? [] ) as $problem ) {
+				if ( is_array( $problem ) && 'modified' === ( $problem['issue'] ?? '' ) && '' !== (string) ( $problem['path'] ?? '' ) ) {
+					$modified[] = (string) $problem['path'];
+				}
+			}
+
 			$checksums = [
-				'status'         => self::text( $data['status'] ?? null ) ?? (string) $checksums_run['status'],
-				'modified_files' => is_array( $modified ) ? array_values( array_map( 'strval', $modified ) ) : [],
+				'status'         => (string) $checksums_run['status'],
+				'modified_files' => $modified,
 			];
 		}
 
-		$config = self::pick( $this->latest_data( 'security.config' ), [ 'checks' ] );
+		$config = $this->latest_data( 'security.config' )['items'] ?? null;
 		$checks = null;
 
 		if ( is_array( $config ) ) {
 			$checks = [];
 
-			foreach ( $config as $check ) {
-				if ( is_array( $check ) ) {
+			foreach ( $config as $item ) {
+				if ( is_array( $item ) ) {
 					$checks[] = [
-						'id'     => (string) ( $check['id'] ?? '' ),
-						'label'  => (string) ( $check['label'] ?? '' ),
-						'status' => (string) ( $check['status'] ?? '' ),
+						'id'     => (string) ( $item['key'] ?? '' ),
+						'label'  => (string) ( $item['title'] ?? '' ),
+						'status' => (string) ( $item['status'] ?? '' ),
 					];
 				}
 			}
@@ -584,42 +604,90 @@ final class SnapshotBuilder {
 		$forms  = $this->latest_data( 'detect.forms' );
 		$mailer = $this->latest_data( 'detect.mailer' );
 
-		$plugins = null;
-
-		if ( is_array( self::pick( $forms, [ 'plugins' ] ) ) ) {
-			$plugins = [];
-
-			foreach ( (array) self::pick( $forms, [ 'plugins' ] ) as $plugin ) {
-				if ( is_array( $plugin ) ) {
-					$plugins[] = [
-						'name'       => (string) ( $plugin['name'] ?? '' ),
-						'slug'       => (string) ( $plugin['slug'] ?? '' ),
-						'form_count' => (int) ( $plugin['form_count'] ?? 0 ),
-						'addons'     => array_values( array_map( 'strval', (array) ( $plugin['addons'] ?? [] ) ) ),
-					];
-				}
-			}
-		}
-
+		$plugins      = null;
 		$integrations = null;
 
-		if ( is_array( self::pick( $forms, [ 'integrations' ] ) ) ) {
+		// [] means detect.forms never ran (null fields); a run with no plugin is an empty list.
+		if ( [] !== $forms ) {
+			$plugins      = [];
 			$integrations = [];
+			$file         = self::text( $forms['plugin'] ?? null );
 
-			foreach ( (array) self::pick( $forms, [ 'integrations' ] ) as $integration ) {
-				$name = is_array( $integration ) ? ( $integration['name'] ?? '' ) : $integration;
-
-				if ( is_scalar( $name ) && '' !== (string) $name ) {
-					$integrations[] = [ 'name' => (string) $name ];
+			if ( null !== $file ) {
+				// Add-ons are the form plugin's integrations (Mailchimp, HubSpot, ...).
+				$addons = [];
+				foreach ( (array) ( $forms['addons'] ?? [] ) as $addon ) {
+					$name = is_array( $addon ) ? self::text( $addon['name'] ?? null ) : null;
+					if ( null !== $name ) {
+						$addons[]       = $name;
+						$integrations[] = [ 'name' => $name ];
+					}
 				}
+
+				$plugins[] = [
+					'name'       => $this->plugin_name( $file ),
+					'slug'       => self::plugin_slug( $file ),
+					'form_count' => (int) ( $forms['form_count'] ?? 0 ),
+					'addons'     => $addons,
+				];
 			}
 		}
 
 		return [
 			'form_plugins'   => $plugins,
-			'sending_method' => self::text( self::pick( $mailer, [ 'method', 'sending_method', 'mailer' ] ) ),
+			'sending_method' => $this->sending_method( $mailer ),
 			'integrations'   => $integrations,
 		];
+	}
+
+	/**
+	 * How the site sends mail, from detect.mailer data (null when it never ran).
+	 *
+	 * @param array<string, mixed> $mailer detect.mailer data.
+	 */
+	private function sending_method( array $mailer ): ?string {
+		if ( [] === $mailer ) {
+			return null;
+		}
+
+		$file = self::text( $mailer['plugin'] ?? null );
+
+		// An installed but inactive mailer plugin does not send anything.
+		if ( null !== $file && ! empty( $mailer['active'] ) ) {
+			return $this->plugin_name( $file );
+		}
+
+		if ( (int) ( $mailer['phpmailer_init_callbacks'] ?? 0 ) > 0 ) {
+			return __( 'Custom code (phpmailer_init)', 'rtcamp-amc-copilot' );
+		}
+
+		return __( 'WordPress default (PHP mail)', 'rtcamp-amc-copilot' );
+	}
+
+	/**
+	 * A plugin's display name from the installed list (its slug when not installed).
+	 *
+	 * @param string $file Plugin file, e.g. 'gravityforms/gravityforms.php'.
+	 */
+	private function plugin_name( string $file ): string {
+		foreach ( $this->facts->plugins() as $plugin ) {
+			if ( $file === $plugin['file'] && '' !== $plugin['name'] ) {
+				return $plugin['name'];
+			}
+		}
+
+		return self::plugin_slug( $file );
+	}
+
+	/**
+	 * A plugin's slug: its folder, or the file name for a single-file plugin.
+	 *
+	 * @param string $file Plugin file.
+	 */
+	private static function plugin_slug( string $file ): string {
+		$dir = dirname( $file );
+
+		return '.' === $dir ? basename( $file, '.php' ) : $dir;
 	}
 
 	/**
@@ -628,17 +696,18 @@ final class SnapshotBuilder {
 	 * @return array<string, mixed>
 	 */
 	private function analytics(): array {
-		$run = $this->runs->latest( 'detect.analytics' );
+		$data = $this->latest_data( 'detect.analytics' );
 
-		if ( null === $run ) {
-			return [];
+		if ( [] === $data ) {
+			return [
+				'gtm_ids' => null,
+				'ga_ids'  => null,
+			];
 		}
 
-		$data = (array) $run['data'];
-
 		return [
-			'gtm_ids' => self::strings( $data['gtm_ids'] ?? [] ),
-			'ga_ids'  => array_values( array_unique( array_merge( self::strings( $data['ga_ids'] ?? [] ), self::strings( $data['ga4_ids'] ?? [] ), self::strings( $data['ua_ids'] ?? [] ) ) ) ),
+			'gtm_ids' => self::strings( $data['gtm'] ?? [] ),
+			'ga_ids'  => array_values( array_unique( array_merge( self::strings( $data['ga4'] ?? [] ), self::strings( $data['ua'] ?? [] ) ) ) ),
 		];
 	}
 
@@ -648,11 +717,14 @@ final class SnapshotBuilder {
 	 * @return array<string, mixed>
 	 */
 	private function accessibility(): array {
-		$data = $this->latest_data( 'detect.accessibility' );
-		$url  = self::text( self::pick( $data, [ 'statement_page', 'statement_url' ] ) );
+		$data  = $this->latest_data( 'detect.accessibility' );
+		$tools = self::strings( $data['tools'] ?? [] );
+		$pages = (array) ( $data['statement_pages'] ?? [] );
+		$first = reset( $pages );
+		$url   = is_array( $first ) ? self::text( $first['url'] ?? null ) : null;
 
 		return [
-			'third_party_tool' => self::text( self::pick( $data, [ 'third_party_tool', 'tool' ] ) ),
+			'third_party_tool' => [] !== $tools ? implode( ', ', $tools ) : null,
 			'statement_page'   => null !== $url ? esc_url_raw( $url ) : null,
 		];
 	}
@@ -751,11 +823,11 @@ final class SnapshotBuilder {
 	 */
 	private function performance( Period $period ): array {
 		$database = $this->latest_data( 'perf.database' );
-		$autoload = self::integer( self::pick( $database, [ 'autoload_size_bytes' ] ) ) ?? $this->facts->autoload_size_bytes();
+		$autoload = self::bytes( $database['autoload_kb'] ?? null, 1024 ) ?? $this->facts->autoload_size_bytes();
 
 		return [
 			'response_trend'      => $this->response_trend( $period ),
-			'database_size_bytes' => self::integer( self::pick( $database, [ 'database_size_bytes', 'total_size_bytes' ] ) ),
+			'database_size_bytes' => self::bytes( $database['total_mb'] ?? null, 1048576 ),
 			'autoload_size_bytes' => $autoload,
 		];
 	}
@@ -934,8 +1006,8 @@ final class SnapshotBuilder {
 
 		return [
 			'avg_response_ms'     => $n > 0 ? (int) round( $sum / $n ) : null,
-			'database_size_bytes' => self::integer( self::pick( $data, [ 'database_size_bytes', 'total_size_bytes' ] ) ),
-			'autoload_size_bytes' => self::integer( self::pick( $data, [ 'autoload_size_bytes' ] ) ),
+			'database_size_bytes' => self::bytes( $data['total_mb'] ?? null, 1048576 ),
+			'autoload_size_bytes' => self::bytes( $data['autoload_kb'] ?? null, 1024 ),
 		];
 	}
 
@@ -1311,6 +1383,16 @@ final class SnapshotBuilder {
 	 */
 	private static function integer( mixed $value ): ?int {
 		return is_numeric( $value ) ? (int) $value : null;
+	}
+
+	/**
+	 * A size in bytes from a check's MB or KB figure (null when absent).
+	 *
+	 * @param mixed $value Size in `$unit`s.
+	 * @param int   $unit  Bytes per unit (1048576 for MB, 1024 for KB).
+	 */
+	private static function bytes( mixed $value, int $unit ): ?int {
+		return is_numeric( $value ) ? (int) round( (float) $value * $unit ) : null;
 	}
 
 	/**

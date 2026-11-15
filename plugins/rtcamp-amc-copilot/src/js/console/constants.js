@@ -21,6 +21,14 @@ export const SCREEN_ARG = 'screen';
  */
 export const getScreens = () => [
 	{
+		slug: 'network',
+		label: __( 'Network Sites', 'rtcamp-amc-copilot' ),
+		description: __(
+			'Central multisite health overview and subsite management.',
+			'rtcamp-amc-copilot'
+		),
+	},
+	{
 		slug: 'overview',
 		label: __( 'Overview', 'rtcamp-amc-copilot' ),
 		description: __(
@@ -117,6 +125,14 @@ export const getScreens = () => [
 		),
 	},
 	{
+		slug: 'help',
+		label: __( 'Help', 'rtcamp-amc-copilot' ),
+		description: __(
+			'How to use AMC Copilot: your first report, field types, the schedule and troubleshooting.',
+			'rtcamp-amc-copilot'
+		),
+	},
+	{
 		slug: 'setup',
 		label: __( 'Setup', 'rtcamp-amc-copilot' ),
 		description: __(
@@ -138,45 +154,66 @@ export const STANDALONE_SCREENS = [ 'setup' ];
  *
  * @return {Array<{slug: string, label: string, screens: string[]}>} Sections.
  */
-export const getSections = () => [
-	{
-		slug: 'overview',
-		label: __( 'Overview', 'rtcamp-amc-copilot' ),
-		screens: [ 'overview' ],
-	},
-	{
-		slug: 'checks',
-		label: __( 'Checks', 'rtcamp-amc-copilot' ),
-		screens: [
-			'updates',
-			'vulnerabilities',
-			'security',
-			'errors',
-			'smoke',
-			'performance',
-		],
-	},
-	{
-		slug: 'inventory',
-		label: __( 'Inventory', 'rtcamp-amc-copilot' ),
-		screens: [ 'inventory' ],
-	},
-	{
-		slug: 'activity',
-		label: __( 'Activity', 'rtcamp-amc-copilot' ),
-		screens: [ 'runs', 'changes' ],
-	},
-	{
-		slug: 'reports',
-		label: __( 'Reports', 'rtcamp-amc-copilot' ),
-		screens: [ 'reports' ],
-	},
-	{
-		slug: 'settings',
-		label: __( 'Settings', 'rtcamp-amc-copilot' ),
-		screens: [ 'settings' ],
-	},
-];
+export const getSections = () => {
+	const isMultisite = Boolean( window.amcCopilot?.isMultisite );
+	const isNetworkAdmin = Boolean( window.amcCopilot?.isNetworkAdmin );
+	const sections = [];
+
+	if ( isMultisite && isNetworkAdmin ) {
+		sections.push( {
+			slug: 'network',
+			label: __( 'Network Sites', 'rtcamp-amc-copilot' ),
+			screens: [ 'network' ],
+		} );
+	}
+
+	sections.push(
+		{
+			slug: 'overview',
+			label: __( 'Overview', 'rtcamp-amc-copilot' ),
+			screens: [ 'overview' ],
+		},
+		{
+			slug: 'checks',
+			label: __( 'Checks', 'rtcamp-amc-copilot' ),
+			screens: [
+				'updates',
+				'vulnerabilities',
+				'security',
+				'errors',
+				'smoke',
+				'performance',
+			],
+		},
+		{
+			slug: 'inventory',
+			label: __( 'Inventory', 'rtcamp-amc-copilot' ),
+			screens: [ 'inventory' ],
+		},
+		{
+			slug: 'activity',
+			label: __( 'Activity', 'rtcamp-amc-copilot' ),
+			screens: [ 'runs', 'changes' ],
+		},
+		{
+			slug: 'reports',
+			label: __( 'Reports', 'rtcamp-amc-copilot' ),
+			screens: [ 'reports' ],
+		},
+		{
+			slug: 'settings',
+			label: __( 'Settings', 'rtcamp-amc-copilot' ),
+			screens: [ 'settings' ],
+		},
+		{
+			slug: 'help',
+			label: __( 'Help', 'rtcamp-amc-copilot' ),
+			screens: [ 'help' ],
+		}
+	);
+
+	return sections;
+};
 
 /**
  * The section a screen belongs to.

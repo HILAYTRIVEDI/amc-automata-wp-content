@@ -20,7 +20,9 @@ import {
 } from './constants';
 import Changes from './screens/Changes';
 import Errors from './screens/Errors';
+import Help from './screens/Help';
 import Inventory from './screens/Inventory';
+import Network from './screens/Network';
 import Overview from './screens/Overview';
 import Performance from './screens/Performance';
 import Reports from './screens/Reports';
@@ -39,6 +41,7 @@ import {
 } from './utils/navigation';
 
 const COMPONENTS = {
+	network: Network,
 	overview: Overview,
 	updates: Updates,
 	vulnerabilities: Vulnerabilities,
@@ -52,6 +55,7 @@ const COMPONENTS = {
 	reports: Reports,
 	settings: Settings,
 	setup: Setup,
+	help: Help,
 };
 
 /**
@@ -84,6 +88,14 @@ function ScreenLink( { screen, className, current, children } ) {
 	);
 }
 
+const SCREEN_ALIASES = {
+	ssl: 'security',
+	checksums: 'security',
+	config: 'security',
+	plugins: 'updates',
+	themes: 'updates',
+};
+
 /**
  * Console shell: page heading, section tabs (core `nav-tab-wrapper`), the
  * section's screens as core `subsubsub` links when it has more than one, and
@@ -98,9 +110,12 @@ function ScreenLink( { screen, className, current, children } ) {
  * @return {Element} App.
  */
 export default function App() {
-	const { screen, finding } = useLocation();
+	const { screen: rawScreen, finding } = useLocation();
+	const screen = SCREEN_ALIASES[ rawScreen ] || rawScreen;
 	const isFindingLink = 'findings' === screen;
-	const current = COMPONENTS[ screen ] ? screen : 'overview';
+	const isNetworkAdmin = Boolean( window.amcCopilot?.isNetworkAdmin );
+	const defaultScreen = isNetworkAdmin ? 'network' : 'overview';
+	const current = COMPONENTS[ screen ] ? screen : defaultScreen;
 	const Screen = COMPONENTS[ current ];
 	const section = sectionFor( current );
 	// The setup wizard is a focused flow: no section tabs.

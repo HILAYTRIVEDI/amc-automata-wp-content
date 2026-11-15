@@ -54,7 +54,7 @@ final class DatabaseCheck implements Check {
 	 * Constructor.
 	 *
 	 * @param callable|null $tables_source   Test seam; default information_schema / SHOW TABLE STATUS.
-	 * @param callable|null $autoload_source Test seam; default SUM(LENGTH(option_value)) WHERE autoload='yes'.
+	 * @param callable|null $autoload_source Test seam; default SUM(LENGTH(option_value)) of every autoloaded option (wp_autoload_values_to_autoload()).
 	 */
 	public function __construct( ?callable $tables_source = null, ?callable $autoload_source = null ) {
 		$this->tables_source   = $tables_source ?? static function (): array {
@@ -119,8 +119,18 @@ final class DatabaseCheck implements Check {
 		$this->autoload_source = $autoload_source ?? static function (): int {
 			global $wpdb;
 
+			// WordPress 6.6+ stores 'on' / 'auto-on' / 'auto' (legacy 'yes' too); ask core for the list.
+			$values = wp_autoload_values_to_autoload();
+
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery
-			$value = $wpdb->get_var( "SELECT SUM(LENGTH(option_value)) FROM {$wpdb->options} WHERE autoload = 'yes'" );
+			$value = $wpdb->get_var(
+				// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- One %s per autoload value, spread from $values.
+				$wpdb->prepare(
+					'SELECT SUM(LENGTH(option_value)) FROM %i WHERE autoload IN (' . implode( ', ', array_fill( 0, count( $values ), '%s' ) ) . ')', // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Placeholders only.
+					$wpdb->options,
+					...$values
+				)
+			);
 
 			return (int) $value;
 		};
@@ -187,7 +197,9 @@ final class DatabaseCheck implements Check {
 
 		if ( $over ) {
 			$finding = new \AMC\Checks\Finding(
-				'autoload:' . (string) (int) $autoload_kb,
+				// One key while over the limit: the size moves daily, and a key per size
+				// would open a new finding (and a new digest entry) on every run.
+				'autoload:over',
 				Severity::MEDIUM,
 				sprintf(
 					/* translators: %s: Autoload size in KB. */

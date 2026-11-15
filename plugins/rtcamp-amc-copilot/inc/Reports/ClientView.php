@@ -103,13 +103,59 @@ final class ClientView implements Registrable {
 			wp_enqueue_style( 'amc-report-print' );
 		}
 
-		// "Download PDF": the browser's print dialog saves an A4 PDF named after
-		// the report ID (the dialog proposes document.title as the file name).
-		wp_register_script( 'amc-report-view', false, [], AMC_COPILOT_VERSION, true );
-		wp_enqueue_script( 'amc-report-view' );
-		wp_add_inline_script(
+		$post_id    = isset( $_GET[ self::QUERY_ARG ] ) ? absint( wp_unslash( $_GET[ self::QUERY_ARG ] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$sent_at    = $post_id > 0 ? (int) get_post_meta( $post_id, ReportEmails::SENT_META, true ) : 0;
+		$recipients = ReportEmails::published_recipients();
+
+		$script_path   = AMC_COPILOT_PATH . 'assets/build/js/report-view.js';
+		$manifest_path = AMC_COPILOT_PATH . 'assets/build/js/report-view.asset.php';
+
+		if ( file_exists( $script_path ) ) {
+			$meta = file_exists( $manifest_path )
+				? require $manifest_path
+				: [
+					'dependencies' => [],
+					'version'      => AMC_COPILOT_VERSION,
+				];
+
+			wp_enqueue_script(
+				'amc-report-view',
+				AMC_COPILOT_URL . 'assets/build/js/report-view.js',
+				$meta['dependencies'] ?? [],
+				$meta['version'] ?? AMC_COPILOT_VERSION,
+				true
+			);
+		} else {
+			wp_register_script( 'amc-report-view', false, [], AMC_COPILOT_VERSION, true );
+			wp_enqueue_script( 'amc-report-view' );
+			wp_add_inline_script(
+				'amc-report-view',
+				'document.addEventListener("click",function(e){var b=e.target.closest("[data-amc-download]");if(!b){return;}var t=document.title;document.title=b.getAttribute("data-amc-download");window.print();setTimeout(function(){document.title=t;},1000);});'
+			);
+		}
+
+		wp_localize_script(
 			'amc-report-view',
-			'document.addEventListener("click",function(e){var b=e.target.closest("[data-amc-download]");if(!b){return;}var t=document.title;document.title=b.getAttribute("data-amc-download");window.print();setTimeout(function(){document.title=t;},1000);});'
+			'amcReportViewData',
+			[
+				'reportId'   => $post_id,
+				'recipients' => $recipients,
+				'sentAt'     => $sent_at,
+				'restUrl'    => esc_url_raw( rest_url( 'amc/v1' ) ),
+				'nonce'      => wp_create_nonce( 'wp_rest' ),
+				'i18n'       => [
+					'confirmTitle'  => __( 'Send Maintenance Report to Client', 'rtcamp-amc-copilot' ),
+					'confirmBody'   => __( 'This will email the report to all registered client recipients:', 'rtcamp-amc-copilot' ),
+					'noRecipients'  => __( 'No client recipients configured. Add recipients in AMC Copilot Settings.', 'rtcamp-amc-copilot' ),
+					'sendNow'       => __( 'Send now', 'rtcamp-amc-copilot' ),
+					'cancel'        => __( 'Cancel', 'rtcamp-amc-copilot' ),
+					'sending'       => __( 'Sending…', 'rtcamp-amc-copilot' ),
+					'successNotice' => __( 'Report sent successfully to client recipients.', 'rtcamp-amc-copilot' ),
+					'errorNotice'   => __( 'Failed to send report to client.', 'rtcamp-amc-copilot' ),
+					'resend'        => __( 'Resend to client', 'rtcamp-amc-copilot' ),
+					'sentJustNow'   => __( 'Sent just now', 'rtcamp-amc-copilot' ),
+				],
+			]
 		);
 
 		add_filter(
@@ -359,6 +405,20 @@ final class ClientView implements Registrable {
 			echo ' <a href="' . esc_url( (string) get_edit_post_link( $post->ID ) ) . '" class="button">' . esc_html__( 'Edit report', 'rtcamp-amc-copilot' ) . '</a>';
 		}
 		echo ' <button type="button" class="button button-primary" data-amc-download="' . esc_attr( $file_name ) . '">' . esc_html__( 'Download PDF', 'rtcamp-amc-copilot' ) . '</button>';
+
+		if ( current_user_can( Capabilities::MANAGE ) ) {
+			$sent_at    = (int) get_post_meta( $post->ID, ReportEmails::SENT_META, true );
+			$is_sent    = $sent_at > 0;
+			$btn_text   = $is_sent ? __( 'Resend to client', 'rtcamp-amc-copilot' ) : __( 'Send to client', 'rtcamp-amc-copilot' );
+			$badge_html = $is_sent
+				? ' <span class="amc-email-sent-badge" id="amc-email-sent-status" style="font-size:12px;color:#15803d;font-weight:600;display:inline-flex;align-items:center;gap:5px;padding:3px 8px;background:#dcfce7;border-radius:9999px;border:1px solid #86efac;">'
+					. '<span style="width:6px;height:6px;border-radius:50%;background:#16a34a;display:inline-block;"></span> '
+					. esc_html( sprintf( __( 'Sent %s', 'rtcamp-amc-copilot' ), wp_date( (string) get_option( 'date_format' ), $sent_at ) ) )
+					. '</span>'
+				: '<span class="amc-email-sent-badge" id="amc-email-sent-status" style="display:none;"></span>';
+
+			echo ' <button type="button" class="button button-secondary amc-send-to-client-btn" id="amc-send-to-client" data-report-id="' . esc_attr( (string) $post->ID ) . '" data-is-published="' . ( 'publish' === $post->post_status ? '1' : '0' ) . '">' . esc_html( $btn_text ) . '</button>' . $badge_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		}
 
 		/**
 		 * Fires in the report toolbar (screen only, not printed).

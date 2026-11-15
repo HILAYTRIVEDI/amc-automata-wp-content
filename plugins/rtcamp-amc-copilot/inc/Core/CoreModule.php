@@ -36,6 +36,7 @@ final class CoreModule extends AbstractModule {
 	protected function get_classes(): array {
 		return [
 			Settings::class,
+			Capabilities::class,
 		];
 	}
 }

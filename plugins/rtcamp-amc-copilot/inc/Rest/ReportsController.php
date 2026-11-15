@@ -14,6 +14,7 @@ use AMC\Core\Capabilities;
 use AMC\Reports\ClientView;
 use AMC\Reports\FieldCatalogue;
 use AMC\Reports\Generator;
+use AMC\Reports\ReportEmails;
 use AMC\Reports\ReportPostType;
 use AMC\Reports\SavedFields;
 use AMC\Reports\SnapshotSchema;
@@ -109,6 +110,8 @@ final class ReportsController extends AbstractController {
 
 		$this->route( '/reports/(?P<id>\d+)/regenerate', self::creatable(), [ $this, 'regenerate' ], [ $this, 'manage' ], $id_arg );
 		$this->route( '/reports/(?P<id>\d+)/snapshot', self::readable(), [ $this, 'get_snapshot' ], [ $this, 'view_reports' ], $id_arg );
+		$this->route( '/reports/(?P<id>\d+)/send-client', self::creatable(), [ $this, 'send_to_client' ], [ $this, 'manage' ], $id_arg );
+		$this->route( '/reports/recipients', self::readable(), [ $this, 'get_publish_recipients' ], [ $this, 'manage' ] );
 
 		$this->route( '/saved-fields', self::readable(), [ $this, 'get_saved_fields' ], [ $this, 'manage' ] );
 		$this->route(
@@ -295,6 +298,61 @@ final class ReportsController extends AbstractController {
 	}
 
 	/**
+	 * POST /reports/{id}/send-client → Send the published report email to client recipients.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|\WP_Error
+	 */
+	public function send_to_client( WP_REST_Request $request ): WP_REST_Response|\WP_Error {
+		$post_id = (int) $request->get_param( 'id' );
+		$post    = get_post( $post_id );
+
+		if ( ! $post instanceof WP_Post || ReportPostType::SLUG !== $post->post_type ) {
+			return new \WP_Error( 'amc_not_found', __( 'Report not found.', 'rtcamp-amc-copilot' ), [ 'status' => 404 ] );
+		}
+
+		if ( 'publish' !== $post->post_status ) {
+			return new \WP_Error( 'amc_not_published', __( 'Only published reports can be sent to clients.', 'rtcamp-amc-copilot' ), [ 'status' => 400 ] );
+		}
+
+		$recipients = ReportEmails::published_recipients();
+
+		if ( [] === $recipients ) {
+			return new \WP_Error( 'amc_no_recipients', __( 'No client recipients configured.', 'rtcamp-amc-copilot' ), [ 'status' => 400 ] );
+		}
+
+		$sent = ReportEmails::send_published_report( $post->ID );
+
+		if ( ! $sent ) {
+			return new \WP_Error( 'amc_send_failed', __( 'Failed to send email. Check mail server settings.', 'rtcamp-amc-copilot' ), [ 'status' => 500 ] );
+		}
+
+		return new WP_REST_Response(
+			[
+				'success'    => true,
+				'recipients' => $recipients,
+				'sent_at'    => (int) get_post_meta( $post->ID, ReportEmails::SENT_META, true ),
+				'message'    => sprintf(
+					/* translators: %d: number of recipients */
+					__( 'Report successfully sent to %d recipient(s).', 'rtcamp-amc-copilot' ),
+					count( $recipients )
+				),
+			]
+		);
+	}
+
+	/**
+	 * GET /reports/recipients → list of recipient email addresses.
+	 */
+	public function get_publish_recipients(): WP_REST_Response {
+		return new WP_REST_Response(
+			[
+				'recipients' => ReportEmails::published_recipients(),
+			]
+		);
+	}
+
+	/**
 	 * Post → Report shape.
 	 *
 	 * @param WP_Post $post Report post.
@@ -302,7 +360,8 @@ final class ReportsController extends AbstractController {
 	 * @return array<string, mixed>
 	 */
 	public function format_report( WP_Post $post ): array {
-		$author = get_userdata( (int) $post->post_author );
+		$author  = get_userdata( (int) $post->post_author );
+		$sent_at = (int) get_post_meta( $post->ID, ReportEmails::SENT_META, true );
 
 		return [
 			'id'           => $post->ID,
@@ -322,6 +381,7 @@ final class ReportsController extends AbstractController {
 			// The read-only view page (ClientView). Drafts can be previewed by engineers only.
 			'view_url'     => null !== ClientView::visible_report( $post->ID ) ? ClientView::view_url( $post->ID ) : null,
 			'build_status' => (string) get_post_meta( $post->ID, '_amc_build_status', true ),
+			'email_sent'   => $sent_at > 0 ? $sent_at : null,
 		];
 	}
 }

@@ -50,7 +50,7 @@ Each `monthly` entry also holds the month's Performance figures, which the Perfo
 | Key | Type | Source |
 | --- | --- | --- |
 | `avg_response_ms` | int or `null` | Mean of the month's `perf.response` runs (`avg_ms`, or the mean of `urls[].response_ms`) |
-| `database_size_bytes` | int or `null` | The month's **last** `perf.database` run (`database_size_bytes` or `total_size_bytes`): a size is a level, not a sum |
+| `database_size_bytes` | int or `null` | The month's **last** `perf.database` run (its `total_mb`, in bytes): a size is a level, not a sum |
 | `autoload_size_bytes` | int or `null` | Same run as `database_size_bytes` |
 
 A month with no matching run holds `null`, rendered as "No data", never zero. These keys are additive, so `schema_version` stays `1`. A quarterly or annual snapshot stored before they existed still renders: the block takes each month's average from the `response_trend` point with the same `start` and shows "No data" for the sizes. Monthly reports keep the weekly `response_trend` and have no `monthly` list, so they render as before.

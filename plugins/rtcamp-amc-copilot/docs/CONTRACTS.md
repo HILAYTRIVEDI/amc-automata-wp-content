@@ -347,6 +347,7 @@ Check     { id, label, group, group_label, schedule, default_schedule, enabled,
             last_run: Run|null, next_run_at|null }
 LatestResult { run: Run, data: <check's Result::$data> }
 Overview  { status, kill_switch, findings_by_severity: { critical, high, medium, low, info },
+            stale: [{ check_id, label, last_run_at }],   (enabled checks only, like status and findings_by_severity)
             groups: [{ group, label, status|null, last_run_at|null, checks }],
             versions: { wordpress, php, mysql, theme: { name, version, parent: {name, version}|null } },
             counts: { plugins, plugins_active, themes, pending_updates: { core, plugins, themes, total } },
