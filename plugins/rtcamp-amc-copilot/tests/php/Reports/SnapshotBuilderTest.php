@@ -11,8 +11,19 @@ namespace AMC\Tests\Reports;
 
 // phpcs:disable WordPress.DB.DirectDatabaseQuery -- Test fixtures backdate rows the repositories stamp with the current time.
 
+use AMC\Checks\Check;
+use AMC\Checks\Context;
+use AMC\Checks\Detection\AccessibilityDetect;
+use AMC\Checks\Detection\AnalyticsDetect;
+use AMC\Checks\Detection\CdnDetect;
+use AMC\Checks\Detection\FormsDetect;
+use AMC\Checks\Detection\MailerDetect;
 use AMC\Checks\Finding;
+use AMC\Checks\Performance\CacheCheck;
+use AMC\Checks\Performance\DatabaseCheck;
 use AMC\Checks\Result;
+use AMC\Checks\Security\ConfigCheck;
+use AMC\Checks\Security\CoreChecksums;
 use AMC\Checks\Severity;
 use AMC\Reports\FieldCatalogue;
 use AMC\Reports\Period;
@@ -42,6 +53,81 @@ final class SnapshotBuilderTest extends ReportsTestCase {
 	}
 
 	/**
+	 * A get_plugins()-shaped list with a form plugin, one add-on and a mailer.
+	 */
+	private const FORM_AND_MAIL_PLUGINS = [
+		'gravityforms/gravityforms.php'                   => [
+			'Name'    => 'Gravity Forms',
+			'Version' => '2.8.4',
+		],
+		'gravityformsmailchimp/gravityformsmailchimp.php' => [
+			'Name'    => 'Gravity Forms Mailchimp Add-On',
+			'Version' => '5.2.0',
+		],
+		'wp-mail-smtp/wp_mail_smtp.php'                   => [
+			'Name'    => 'WP Mail SMTP',
+			'Version' => '4.1.0',
+		],
+	];
+
+	/**
+	 * Run a real check and store its Result as the latest run.
+	 *
+	 * @param Check  $check Check, built with test seams.
+	 * @param string $at    UTC 'Y-m-d H:i:s' (default now).
+	 */
+	private function seed_check( Check $check, string $at = '' ): void {
+		$result = $check->run( Context::for_tests() );
+
+		$this->seed_run( $check->id(), $result->data, $at, $result->status->value );
+	}
+
+	/**
+	 * A fetch seam returning a 200 response.
+	 *
+	 * @param string                $body    Body.
+	 * @param array<string, string> $headers Headers.
+	 */
+	private static function fetch( string $body, array $headers = [] ): callable {
+		return static fn (): array => [
+			'headers'  => $headers,
+			'body'     => '<html><head>' . $body . '</head><body></body></html>',
+			'response' => [
+				'code'    => 200,
+				'message' => 'OK',
+			],
+			'cookies'  => [],
+			'filename' => null,
+		];
+	}
+
+	/**
+	 * A home URL seam.
+	 */
+	private static function home(): callable {
+		return static fn (): string => 'https://example.test/';
+	}
+
+	/**
+	 * Site facts that include the form and mailer plugins.
+	 */
+	private function facts_with_form_and_mail_plugins(): StubSiteFacts {
+		$facts = new StubSiteFacts();
+
+		foreach ( self::FORM_AND_MAIL_PLUGINS as $file => $header ) {
+			$facts->installed[] = [
+				'file'    => $file,
+				'slug'    => dirname( $file ),
+				'name'    => $header['Name'],
+				'version' => $header['Version'],
+				'active'  => true,
+			];
+		}
+
+		return $facts;
+	}
+
+	/**
 	 * Seed everything the builder reads for October 2026.
 	 */
 	private function seed_october(): void {
@@ -58,69 +144,117 @@ final class SnapshotBuilderTest extends ReportsTestCase {
 			]
 		);
 
-		$this->seed_run( 'detect.cdn', [ 'cdn' => 'Cloudflare' ] );
-		$this->seed_run(
-			'detect.forms',
-			[
-				'plugins'      => [
+		// Every check the builder reads is RUN here (through its test seams) and
+		// its real Result stored, so a key-name drift between a check and the
+		// builder fails this test instead of shipping an empty report field.
+		$this->seed_check( new CdnDetect( self::fetch( '', [ 'cf-ray' => '8ab1c2d3e4f5-LHR' ] ), self::home() ) );
+		$this->seed_check(
+			new FormsDetect(
+				static fn (): array => self::FORM_AND_MAIL_PLUGINS,
+				static fn (): array => [ 'gravityforms/gravityforms.php', 'gravityformsmailchimp/gravityformsmailchimp.php' ],
+				static fn (): int => 4
+			)
+		);
+		$this->seed_check(
+			new MailerDetect(
+				static fn (): array => self::FORM_AND_MAIL_PLUGINS,
+				static fn (): array => [ 'wp-mail-smtp/wp_mail_smtp.php' ],
+				static fn (): int => 1
+			)
+		);
+		$this->seed_check(
+			new AnalyticsDetect(
+				self::fetch(
+					'<script src="https://www.googletagmanager.com/gtm.js?id=GTM-ABC123"></script>'
+					. '<script async src="https://www.googletagmanager.com/gtag/js?id=G-XYZ789"></script>'
+					. "<script>gtag('config','G-XYZ789');</script>"
+				),
+				self::home()
+			)
+		);
+		$this->seed_check(
+			new AccessibilityDetect(
+				self::fetch( '<script src="https://cdn.userway.org/widget.js"></script>' ),
+				self::home(),
+				static fn (): array => [
 					[
-						'name'       => 'Gravity Forms',
-						'slug'       => 'gravityforms',
-						'form_count' => 4,
-						'addons'     => [ 'Mailchimp' ],
+						'title' => 'Accessibility statement',
+						'url'   => 'https://example.test/accessibility',
+					],
+				]
+			)
+		);
+		$this->seed_check(
+			new CacheCheck(
+				static fn (): bool => true,
+				static fn (): \WP_Error => new \WP_Error( 'http_request_failed', 'No fetch expected.' ),
+				static fn (): array => [
+					'page_cache'   => [
+						'status' => 'good',
+						'label'  => 'Page cache is detected and the server response time is good',
+					],
+					'object_cache' => [
+						'status' => 'good',
+						'label'  => 'A persistent object cache is being used',
+					],
+					'detail'       => [
+						'status'                 => 'good',
+						'advanced_cache_present' => true,
+						'headers'                => [ 'x-cache' ],
+						'response_time'          => 120.0,
+					],
+				]
+			)
+		);
+		$this->seed_check(
+			new DatabaseCheck(
+				static fn (): array => [
+					'source' => 'information_schema',
+					'tables' => [
+						[
+							'name'     => 'wp_posts',
+							'rows'     => 1200,
+							'data_mb'  => 40.0,
+							'index_mb' => 10.0,
+							'total_mb' => 50.0,
+						],
 					],
 				],
-				'integrations' => [ [ 'name' => 'Mailchimp' ] ],
-			]
-		);
-		$this->seed_run( 'detect.mailer', [ 'method' => 'SMTP (WP Mail SMTP)' ] );
-		$this->seed_run(
-			'detect.analytics',
-			[
-				'gtm_ids' => [ 'GTM-ABC123' ],
-				'ga_ids'  => [ 'G-XYZ789' ],
-			]
-		);
-		$this->seed_run(
-			'detect.accessibility',
-			[
-				'tool'           => 'UserWay',
-				'statement_page' => 'https://example.test/accessibility',
-			]
-		);
-		$this->seed_run( 'perf.cache', [ 'page_cache' => 'Detected (WP Rocket)' ] );
-		$this->seed_run(
-			'perf.database',
-			[
-				'database_size_bytes' => 52428800,
-				'autoload_size_bytes' => 700000,
-			]
+				static fn (): int => 716800
+			)
 		);
 		$this->seed_run(
 			'ssl.certificate',
 			[
-				'issuer'     => "Let's Encrypt",
-				'expires_at' => '2027-01-09',
+				'issuer'    => "Let's Encrypt",
+				'valid_to'  => '2027-01-09T00:00:00+00:00',
+				'days_left' => 68,
 			]
 		);
-		$this->seed_run(
-			'security.checksums',
-			[
-				'status'         => 'pass',
-				'modified_files' => [],
-			]
-		);
-		$this->seed_run(
-			'security.config',
-			[
-				'checks' => [
-					[
-						'id'     => 'file_edit',
-						'label'  => 'File editing disabled',
-						'status' => 'pass',
-					],
+		$this->seed_check(
+			new CoreChecksums(
+				static fn (): array => [
+					'index.php'    => md5( 'index' ),
+					'wp-login.php' => md5( 'login' ),
 				],
-			]
+				static fn ( string $path ): ?string => 'wp-login.php' === $path ? md5( 'tampered' ) : md5( 'index' ),
+				static fn (): float => 0.0,
+				static fn (): string => '6.9.1',
+				static fn (): string => 'en_US'
+			)
+		);
+		$this->seed_check(
+			new ConfigCheck(
+				static fn (): array => [
+					'disallow_file_edit'    => false,
+					'wp_debug'              => false,
+					'wp_debug_display'      => false,
+					'salts'                 => [],
+					'admin_username_exists' => false,
+					'xmlrpc_enabled'        => false,
+					'uploads_listing'       => false,
+				]
+			)
 		);
 
 		// Smoke: two URLs, one failing run, one loopback-blocked run (not counted).
@@ -243,7 +377,7 @@ final class SnapshotBuilderTest extends ReportsTestCase {
 	public function test_every_auto_field_is_filled_from_stored_data(): void {
 		$this->seed_october();
 
-		$snapshot = $this->builder()->build( $this->october(), $this->engineer, 'cron', false );
+		$snapshot = $this->builder( $this->facts_with_form_and_mail_plugins() )->build( $this->october(), $this->engineer, 'cron', false );
 
 		foreach ( FieldCatalogue::auto() as $section => $fields ) {
 			foreach ( $fields as $field ) {
@@ -269,14 +403,79 @@ final class SnapshotBuilderTest extends ReportsTestCase {
 		$this->assertSame( "Let's Encrypt", $sections['ssl']['issuer'] );
 		$this->assertSame( '2027-01-09', $sections['ssl']['expires_at'] );
 		$this->assertSame( 68, $sections['ssl']['days_left'], '68 days 18 hours, rounded down' );
-		$this->assertSame( 'Cloudflare', $sections['caching_cdn']['cdn'] );
-		$this->assertSame( 'Redis', $sections['caching_cdn']['object_cache'] );
-		$this->assertSame( 'pass', $sections['security']['core_checksums']['status'] );
-		$this->assertSame( 'Gravity Forms', $sections['forms']['form_plugins'][0]['name'] );
+		$this->assertSame( 'cloudflare', $sections['caching_cdn']['cdn'] );
+		$this->assertSame( 'Detected', $sections['caching_cdn']['page_cache'] );
+		$this->assertSame( 'Persistent object cache', $sections['caching_cdn']['object_cache'], 'from perf.cache, not the live site (the stub says Redis)' );
+		$this->assertSame(
+			[
+				'status'         => 'fail',
+				'modified_files' => [ 'wp-login.php' ],
+			],
+			$sections['security']['core_checksums']
+		);
+		$this->assertContains(
+			[
+				'id'     => 'disallow_file_edit',
+				'label'  => 'Plugin and theme file editing',
+				'status' => 'fail',
+			],
+			$sections['security']['config_checks']
+		);
+		$this->assertSame(
+			[
+				[
+					'name'       => 'Gravity Forms',
+					'slug'       => 'gravityforms',
+					'form_count' => 4,
+					'addons'     => [ 'Gravity Forms Mailchimp Add-On' ],
+				],
+			],
+			$sections['forms']['form_plugins']
+		);
+		$this->assertSame( [ [ 'name' => 'Gravity Forms Mailchimp Add-On' ] ], $sections['forms']['integrations'] );
+		$this->assertSame( 'WP Mail SMTP', $sections['forms']['sending_method'] );
 		$this->assertSame( [ 'GTM-ABC123' ], $sections['analytics']['gtm_ids'] );
-		$this->assertSame( 'UserWay', $sections['accessibility']['third_party_tool'] );
-		$this->assertSame( 52428800, $sections['performance']['database_size_bytes'] );
-		$this->assertSame( 700000, $sections['performance']['autoload_size_bytes'] );
+		$this->assertSame( [ 'G-XYZ789' ], $sections['analytics']['ga_ids'] );
+		$this->assertSame( 'userway', $sections['accessibility']['third_party_tool'] );
+		$this->assertSame( 'https://example.test/accessibility', $sections['accessibility']['statement_page'] );
+		$this->assertSame( 52428800, $sections['performance']['database_size_bytes'], '50 MB' );
+		$this->assertSame( 716800, $sections['performance']['autoload_size_bytes'], '700 KB, from perf.database, not the live site' );
+	}
+
+	public function test_forms_section_when_no_form_or_mailer_plugin_is_installed(): void {
+		$this->seed_check( new FormsDetect( static fn (): array => [], static fn (): array => [], static fn (): ?int => null ) );
+		$this->seed_check( new MailerDetect( static fn (): array => [], static fn (): array => [], static fn (): int => 0 ) );
+
+		$forms = $this->builder()->build( $this->october(), 0, 'cron', false )['sections']['forms'];
+
+		$this->assertSame( [], $forms['form_plugins'], 'checked and none found is an empty list, not null' );
+		$this->assertSame( [], $forms['integrations'] );
+		$this->assertSame( 'WordPress default (PHP mail)', $forms['sending_method'] );
+	}
+
+	public function test_sending_method_for_custom_phpmailer_code_and_an_inactive_mailer(): void {
+		$this->seed_check(
+			new MailerDetect(
+				static fn (): array => self::FORM_AND_MAIL_PLUGINS,
+				static fn (): array => [],
+				static fn (): int => 2
+			)
+		);
+
+		$forms = $this->builder( $this->facts_with_form_and_mail_plugins() )->build( $this->october(), 0, 'cron', false )['sections']['forms'];
+
+		$this->assertSame( 'Custom code (phpmailer_init)', $forms['sending_method'], 'an installed but inactive mailer does not send' );
+	}
+
+	public function test_analytics_and_accessibility_without_a_run_are_null(): void {
+		$sections = $this->builder()->build( $this->october(), 0, 'cron', false )['sections'];
+
+		$this->assertArrayHasKey( 'gtm_ids', $sections['analytics'] );
+		$this->assertNull( $sections['analytics']['gtm_ids'] );
+		$this->assertNull( $sections['analytics']['ga_ids'] );
+		$this->assertNull( $sections['accessibility']['third_party_tool'] );
+		$this->assertNull( $sections['security']['config_checks'] );
+		$this->assertNull( $sections['caching_cdn']['page_cache'] );
 	}
 
 	public function test_snapshot_envelope_and_engineer_fields(): void {
@@ -669,7 +868,7 @@ final class SnapshotBuilderTest extends ReportsTestCase {
 				return Result::pass( 'ok', [ 'plugins' => 3 ] );
 			}
 		);
-		$detect    = new FakeCheck( 'detect.cdn', Result::pass( 'ok', [ 'cdn' => 'Fastly' ] ) );
+		$detect    = new FakeCheck( 'detect.cdn', Result::pass( 'ok', [ 'provider' => 'fastly' ] ) );
 		$this->register_checks( $inventory, $detect );
 
 		$builder  = $this->builder();
@@ -682,7 +881,7 @@ final class SnapshotBuilderTest extends ReportsTestCase {
 
 		$this->assertSame( 'deployed', $snapshot['sections']['plugins_themes']['updated'][0]['slug'] );
 		$this->assertSame( 'deploy', $snapshot['sections']['plugins_themes']['updated'][0]['source'] );
-		$this->assertSame( 'Fastly', $snapshot['sections']['caching_cdn']['cdn'], 'the fresh run is what the builder reads' );
+		$this->assertSame( 'fastly', $snapshot['sections']['caching_cdn']['cdn'], 'the fresh run is what the builder reads' );
 	}
 
 	public function test_a_check_that_throws_does_not_break_the_snapshot(): void {
@@ -792,28 +991,28 @@ final class SnapshotBuilderTest extends ReportsTestCase {
 		$this->seed_run(
 			'perf.database',
 			[
-				'database_size_bytes' => 40000000,
-				'autoload_size_bytes' => 500000,
+				'total_mb'    => 40.0,
+				'autoload_kb' => 500.0,
 			],
 			'2026-07-05 10:00:00'
 		);
 		$this->seed_run(
 			'perf.database',
 			[
-				'total_size_bytes'    => 42000000,
-				'autoload_size_bytes' => 600000,
+				'total_mb'    => 42.0,
+				'autoload_kb' => 600.0,
 			],
 			'2026-07-25 10:00:00'
 		);
-		$this->seed_run( 'perf.database', [ 'database_size_bytes' => 50000000 ], '2026-09-10 10:00:00' );
+		$this->seed_run( 'perf.database', [ 'total_mb' => 50.0 ], '2026-09-10 10:00:00' );
 		// Outside the quarter: must not leak in.
-		$this->seed_run( 'perf.database', [ 'database_size_bytes' => 1 ], '2026-06-30 10:00:00' );
+		$this->seed_run( 'perf.database', [ 'total_mb' => 0.01 ], '2026-06-30 10:00:00' );
 
 		$monthly = $this->builder()->build( $period, 0, 'cron', false )['monthly'];
 
 		$this->assertSame( [ 400, null, 800 ], array_column( $monthly, 'avg_response_ms' ) );
-		$this->assertSame( [ 42000000, null, 50000000 ], array_column( $monthly, 'database_size_bytes' ) );
-		$this->assertSame( [ 600000, null, null ], array_column( $monthly, 'autoload_size_bytes' ), 'a run without an autoload size is null, not zero' );
+		$this->assertSame( [ 44040192, null, 52428800 ], array_column( $monthly, 'database_size_bytes' ), 'total_mb in bytes' );
+		$this->assertSame( [ 614400, null, null ], array_column( $monthly, 'autoload_size_bytes' ), 'autoload_kb in bytes; a run without an autoload size is null, not zero' );
 		$this->assertArrayHasKey( 'plugins_updated', $monthly[0], 'existing monthly keys are untouched' );
 		$this->assertArrayHasKey( 'fatal', $monthly[0] );
 	}
@@ -838,13 +1037,13 @@ final class SnapshotBuilderTest extends ReportsTestCase {
 		$period = Periods::previous( Period::TYPE_YEAR, new DateTimeImmutable( '2027-01-02 09:00:00', $tz ), null, $tz );
 
 		$this->seed_run( 'perf.response', [ 'avg_ms' => 120 ], '2026-03-15 10:00:00' );
-		$this->seed_run( 'perf.database', [ 'database_size_bytes' => 9000000 ], '2026-12-31 22:00:00' );
+		$this->seed_run( 'perf.database', [ 'total_mb' => 9.0 ], '2026-12-31 22:00:00' );
 
 		$monthly = $this->builder()->build( $period, 0, 'cron', false )['monthly'];
 
 		$this->assertCount( 12, $monthly );
 		$this->assertSame( 120, $monthly[2]['avg_response_ms'] );
-		$this->assertSame( 9000000, $monthly[11]['database_size_bytes'] );
+		$this->assertSame( 9437184, $monthly[11]['database_size_bytes'] );
 		$this->assertNull( $monthly[5]['avg_response_ms'] );
 	}
 

@@ -739,3 +739,122 @@
 		gap: 8px;
 	}
 }
+
+// Help screen: a sticky, grouped topic list beside one topic at a time.
+.amc-help {
+	display: grid;
+	grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+	gap: 24px;
+	align-items: start;
+
+	.amc-help-sidebar {
+		position: sticky;
+		top: 48px;
+		max-height: calc(100vh - 64px);
+		overflow-y: auto;
+	}
+
+	.amc-help-count {
+		min-height: 1.5em;
+		margin: 4px 0 8px;
+	}
+
+	.amc-help-group-label {
+		margin: 16px 0 4px;
+		font-size: 11px;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: #50575e;
+	}
+
+	.amc-help-contents ul {
+		margin: 0;
+		list-style: none;
+		padding: 0;
+	}
+
+	.amc-help-contents a {
+		display: block;
+		padding: 6px 10px;
+		border-inline-start: 3px solid transparent;
+		text-decoration: none;
+
+		&:hover {
+			background: #f0f0f1;
+		}
+
+		&[aria-current="page"] {
+			border-inline-start-color: var(--wp-admin-theme-color, #2271b1);
+			background: #f0f6fc;
+			font-weight: 600;
+		}
+	}
+
+	.amc-help-main {
+		max-width: 880px;
+	}
+
+	#amc-help-topic-title:focus {
+		outline: none;
+	}
+
+	.amc-help-table {
+		margin: 8px 0 12px;
+
+		th[scope="row"] {
+			font-weight: 600;
+		}
+	}
+
+	.amc-help-topic {
+
+		// Table names, meta keys and commands are long; let them wrap.
+		code {
+			overflow-wrap: anywhere;
+		}
+
+		dt {
+			font-weight: 600;
+			margin-top: 12px;
+		}
+
+		dd {
+			margin: 4px 0 0;
+		}
+
+		ol,
+		ul {
+			padding-inline-start: 1.5em;
+		}
+
+		ul {
+			list-style: disc;
+		}
+
+		li {
+			margin-bottom: 6px;
+		}
+	}
+
+	.amc-help-pager {
+		display: flex;
+		justify-content: space-between;
+		gap: 8px;
+		margin-top: 24px;
+		padding-top: 16px;
+		border-top: 1px solid #f0f0f1;
+	}
+}
+
+@media (max-width: 960px) {
+
+	.amc-help {
+		grid-template-columns: minmax(0, 1fr);
+
+		.amc-help-sidebar {
+			position: static;
+			max-height: none;
+		}
+	}
+}

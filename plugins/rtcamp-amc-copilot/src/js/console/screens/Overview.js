@@ -170,6 +170,38 @@ export default function Overview() {
 						</Notice>
 					) }
 
+					{ data.stale?.length > 0 && (
+						<Notice status="warning" isDismissible={ false }>
+							<p>
+								{ sprintf(
+									/* translators: %d: Number of checks. */
+									_n(
+										'%d check has not run for over two of its intervals, so its result below may be out of date. Check that WP-Cron is running.',
+										'%d checks have not run for over two of their intervals, so their results below may be out of date. Check that WP-Cron is running.',
+										data.stale.length,
+										'rtcamp-amc-copilot'
+									),
+									data.stale.length
+								) }
+							</p>
+							<ul>
+								{ data.stale.map( ( item ) => (
+									<li key={ item.check_id }>
+										{ sprintf(
+											/* translators: 1: Check name, 2: Date and time of its last result. */
+											__(
+												'%1$s: last result %2$s',
+												'rtcamp-amc-copilot'
+											),
+											item.label,
+											formatDateTime( item.last_run_at )
+										) }
+									</li>
+								) ) }
+							</ul>
+						</Notice>
+					) }
+
 					<Postbox
 						className="amc-summary"
 						title={ __( 'Site status', 'rtcamp-amc-copilot' ) }

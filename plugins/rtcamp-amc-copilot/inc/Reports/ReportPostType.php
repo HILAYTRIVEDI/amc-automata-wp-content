@@ -64,6 +64,10 @@ final class ReportPostType extends AbstractPostType {
 		'_amc_snapshot_taken_at' => 'string',
 		'_amc_report_id'         => 'string',
 		'_amc_build_status'      => 'string',
+		'_amc_has_failures'      => 'boolean',
+		'_amc_issue_count'       => 'integer',
+		'_amc_issues'            => 'string',
+		'_amc_send_publish_email'=> 'boolean',
 	];
 
 	/**
@@ -124,6 +128,9 @@ final class ReportPostType extends AbstractPostType {
 		add_filter( 'user_has_cap', [ $this, 'map_caps' ], 10, 1 );
 		add_filter( 'rest_post_dispatch', [ self::class, 'noindex_headers' ], 10, 3 );
 		add_action( 'enqueue_block_assets', [ self::class, 'enqueue_editor_fonts' ] );
+		add_action( 'enqueue_block_editor_assets', [ self::class, 'enqueue_editor_assets' ] );
+		add_filter( 'manage_' . self::SLUG . '_posts_columns', [ self::class, 'manage_columns' ] );
+		add_action( 'manage_' . self::SLUG . '_posts_custom_column', [ self::class, 'render_column' ], 10, 2 );
 	}
 
 	/**
@@ -142,6 +149,179 @@ final class ReportPostType extends AbstractPostType {
 		}
 
 		Brand::enqueue_fonts();
+	}
+
+	/**
+	 * Enqueue the report editor script and styles when editing an amc_report.
+	 */
+	public static function enqueue_editor_assets(): void {
+		if ( ! is_admin() || ! function_exists( 'get_current_screen' ) ) {
+			return;
+		}
+
+		$screen = get_current_screen();
+
+		if ( null === $screen || self::SLUG !== $screen->post_type || ! $screen->is_block_editor() ) {
+			return;
+		}
+
+		$manifest_path = AMC_COPILOT_PATH . 'assets/build/js/editor.asset.php';
+		$script_path   = AMC_COPILOT_PATH . 'assets/build/js/editor.js';
+
+		if ( file_exists( $script_path ) ) {
+			$meta = file_exists( $manifest_path )
+				? require $manifest_path
+				: [
+					'dependencies' => [],
+					'version'      => AMC_COPILOT_VERSION,
+				];
+
+			wp_enqueue_script(
+				'rtcamp-amc-copilot-editor',
+				AMC_COPILOT_URL . 'assets/build/js/editor.js',
+				$meta['dependencies'] ?? [],
+				$meta['version'] ?? AMC_COPILOT_VERSION,
+				true
+			);
+
+			if ( function_exists( 'wp_set_script_translations' ) ) {
+				wp_set_script_translations( 'rtcamp-amc-copilot-editor', 'rtcamp-amc-copilot' );
+			}
+
+			$post_id   = isset( $_GET['post'] ) ? absint( $_GET['post'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$sent_at   = $post_id > 0 ? (int) get_post_meta( $post_id, ReportEmails::SENT_META, true ) : 0;
+			$send_meta = $post_id > 0 ? get_post_meta( $post_id, '_amc_send_publish_email', true ) : '';
+
+			wp_localize_script(
+				'rtcamp-amc-copilot-editor',
+				'amcReportEditor',
+				[
+					'recipients'       => ReportEmails::published_recipients(),
+					'hasSentEmail'     => $sent_at > 0,
+					'sentAt'           => $sent_at,
+					'sendPublishEmail' => '' === $send_meta ? true : (bool) $send_meta,
+					'restUrl'          => esc_url_raw( rest_url( 'amc/v1' ) ),
+					'nonce'            => wp_create_nonce( 'wp_rest' ),
+				]
+			);
+		}
+
+		$css_path = AMC_COPILOT_PATH . 'assets/build/css/editor.css';
+		if ( file_exists( $css_path ) ) {
+			wp_enqueue_style(
+				'rtcamp-amc-copilot-editor',
+				AMC_COPILOT_URL . 'assets/build/css/editor.css',
+				[],
+				(string) filemtime( $css_path )
+			);
+		}
+	}
+
+	/**
+	 * Customize post list columns for amc_report.
+	 *
+	 * @param array<string, string> $columns Existing columns.
+	 *
+	 * @return array<string, string>
+	 */
+	public static function manage_columns( array $columns ): array {
+		$ordered = [];
+
+		if ( isset( $columns['cb'] ) ) {
+			$ordered['cb'] = $columns['cb'];
+		}
+
+		$ordered['title']         = $columns['title'] ?? __( 'Title', 'rtcamp-amc-copilot' );
+		$ordered['amc_report_id'] = __( 'Report ID', 'rtcamp-amc-copilot' );
+		$ordered['amc_period']    = __( 'Period', 'rtcamp-amc-copilot' );
+		$ordered['amc_health']    = __( 'Health / Issues', 'rtcamp-amc-copilot' );
+
+		if ( isset( $columns['date'] ) ) {
+			$ordered['date'] = $columns['date'];
+		}
+
+		return $ordered;
+	}
+
+	/**
+	 * Render custom column content.
+	 *
+	 * @param string $column  Column name.
+	 * @param int    $post_id Post ID.
+	 */
+	public static function render_column( string $column, int $post_id ): void {
+		if ( 'amc_report_id' === $column ) {
+			$id = (string) get_post_meta( $post_id, '_amc_report_id', true );
+			echo esc_html( '' !== $id ? $id : '—' );
+			return;
+		}
+
+		if ( 'amc_period' === $column ) {
+			$start = (string) get_post_meta( $post_id, '_amc_period_start', true );
+			$end   = (string) get_post_meta( $post_id, '_amc_period_end', true );
+			if ( '' !== $start && '' !== $end ) {
+				echo esc_html( sprintf( '%s – %s', $start, $end ) );
+			} else {
+				echo esc_html__( '—', 'rtcamp-amc-copilot' );
+			}
+			return;
+		}
+
+		if ( 'amc_health' === $column ) {
+			$build_status = (string) get_post_meta( $post_id, '_amc_build_status', true );
+			if ( self::BUILD_PENDING === $build_status ) {
+				echo '<span class="amc-status-badge amc-status-badge--pending" style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:9999px;font-weight:600;font-size:11px;display:inline-flex;align-items:center;gap:4px;">' . esc_html__( 'Generating...', 'rtcamp-amc-copilot' ) . '</span>';
+				return;
+			}
+
+			// Ensure issues are computed if not yet cached.
+			$has_failures_raw = get_post_meta( $post_id, '_amc_has_failures', true );
+			if ( '' === $has_failures_raw ) {
+				$snapshot = SnapshotSchema::for_post( $post_id );
+				ReportIssues::update_post_issues( $post_id, $snapshot );
+				$has_failures_raw = get_post_meta( $post_id, '_amc_has_failures', true );
+			}
+
+			$has_failures = ! empty( $has_failures_raw );
+			$issues       = ReportIssues::for_post( $post_id );
+			$count        = count( $issues );
+
+			if ( $has_failures || $count > 0 ) {
+				$failed_links = [];
+
+				foreach ( $issues as $issue ) {
+					$title = $issue['section_title'] ?? $issue['section'];
+					$url   = ! empty( $issue['url'] ) && ! str_contains( $issue['url'], 'screen=overview' )
+						? $issue['url']
+						: ReportIssues::get_url_for_section( (string) ( $issue['section'] ?? '' ) );
+
+					$failed_links[ $title ] = $url;
+				}
+
+				$badge_text = sprintf(
+					/* translators: %d: Number of detected issues. */
+					_n( '%d Issue (Failed)', '%d Issues (Failed)', $count, 'rtcamp-amc-copilot' ),
+					$count
+				);
+
+				echo '<span class="amc-status-badge amc-status-badge--fail" style="background:#fee2e2;color:#991b1b;padding:3px 10px;border-radius:9999px;font-weight:600;font-size:11px;display:inline-flex;align-items:center;gap:5px;border:1px solid #f87171;"><span style="width:7px;height:7px;border-radius:50%;background:#dc2626;"></span> ' . esc_html( $badge_text ) . '</span>';
+
+				if ( [] !== $failed_links ) {
+					$rendered_links = [];
+					foreach ( $failed_links as $title => $url ) {
+						$rendered_links[] = sprintf(
+							'<a href="%1$s" target="_blank" rel="noopener noreferrer" style="color:#b91c1c;text-decoration:underline;text-underline-offset:2px;">%2$s ↗</a>',
+							esc_url( $url ),
+							esc_html( $title )
+						);
+					}
+
+					echo '<div style="font-size:11px;color:#dc2626;margin-top:4px;font-weight:500;">' . wp_kses_post( implode( ', ', $rendered_links ) ) . '</div>';
+				}
+			} else {
+				echo '<span class="amc-status-badge amc-status-badge--pass" style="background:#dcfce7;color:#166534;padding:3px 10px;border-radius:9999px;font-weight:600;font-size:11px;display:inline-flex;align-items:center;gap:5px;border:1px solid #86efac;"><span style="width:7px;height:7px;border-radius:50%;background:#16a34a;"></span> ' . esc_html__( 'All Clear', 'rtcamp-amc-copilot' ) . '</span>';
+			}
+		}
 	}
 
 	/**

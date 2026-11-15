@@ -11,6 +11,7 @@ namespace AMC\Core;
 
 use AMC\Storage\ChangesRepository;
 use WP_User;
+use rtCamp\WPPrimitives\Contracts\Interfaces\Registrable;
 
 /**
  * Class Capabilities
@@ -19,6 +20,8 @@ use WP_User;
  *   engineer keeps their normal role. Console, runs, settings, reports.
  * - `amc_view_reports`: added to the `administrator` ROLE on activation.
  *   Read published reports only.
+ * - On multisite: super admins automatically receive `amc_manage` and
+ *   `amc_view_reports` via the `user_has_cap` filter.
  *
  * Granting/revoking `amc_manage` needs `amc_manage` + `manage_options` from
  * the acting user (checked by the REST route / CLI command, not here) and
@@ -27,7 +30,34 @@ use WP_User;
  *
  * @since 0.1.0
  */
-final class Capabilities {
+final class Capabilities implements Registrable {
+
+	/**
+	 * Register hooks.
+	 */
+	public function register_hooks(): void {
+		add_filter( 'user_has_cap', [ self::class, 'filter_user_has_cap' ], 10, 4 );
+	}
+
+	/**
+	 * Filter user capabilities to automatically grant multisite super admins
+	 * amc_manage and amc_view_reports across the entire network.
+	 *
+	 * @param array<string, bool>  $allcaps All capabilities of the user.
+	 * @param array<string>        $caps    Required primitive capabilities.
+	 * @param array<string, mixed> $args    Context arguments (cap, user_id, ...).
+	 * @param WP_User              $user    User object.
+	 *
+	 * @return array<string, bool>
+	 */
+	public static function filter_user_has_cap( array $allcaps, array $caps, array $args, WP_User $user ): array {
+		if ( is_multisite() && is_super_admin( $user->ID ) ) {
+			$allcaps[ self::MANAGE ]       = true;
+			$allcaps[ self::VIEW_REPORTS ] = true;
+		}
+
+		return $allcaps;
+	}
 
 	/**
 	 * Engineer capability (console + everything else).

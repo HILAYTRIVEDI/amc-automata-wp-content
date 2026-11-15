@@ -40,6 +40,9 @@ use AMC\Support\AdminFunctions;
  * Status rules:
  *   any closed or abandoned -> WARN + Finding MEDIUM per plugin
  *   otherwise                -> PASS
+ *   partial (nothing resolves) when wordpress.org did not answer for some
+ *   plugin (network failure, plugins_api() unavailable). Answers from a
+ *   third-party updater on the plugins_api filter (`external`) are not wp.org.
  *
  * @since 0.1.0
  */
@@ -152,6 +155,7 @@ final class PluginInventory implements Check {
 		$findings  = [];
 		$closed    = 0;
 		$abandoned = 0;
+		$unknown   = false;
 
 		foreach ( $plugins as $file => $meta ) {
 			$meta          = is_array( $meta ) ? $meta : [];
@@ -162,16 +166,26 @@ final class PluginInventory implements Check {
 			$last_updated  = null;
 
 			if ( is_wp_error( $info ) ) {
-				// A closed plugin is still on wp.org: the API answers {"error":"closed"} and
-				// plugins_api() turns that into a WP_Error whose message is "closed". Any
-				// other error ("Plugin not found.", a network failure) tells us nothing.
-				if ( 'closed' === $info->get_error_message() ) {
+				// wordpress.org answers {"error":"closed"} for a closed plugin (still on
+				// wp.org) and {"error":"Plugin not found."} for one it does not host;
+				// plugins_api() turns both into a WP_Error with that message. Anything
+				// else (a network failure, an unreadable body) is not an answer.
+				$message = $info->get_error_message();
+
+				if ( 'closed' === $message ) {
 					$wp_org        = true;
 					$closed_plugin = true;
+				} elseif ( 'Plugin not found.' !== $message ) {
+					$unknown = true;
 				}
 			} elseif ( is_object( $info ) ) {
-				$wp_org       = true;
-				$last_updated = isset( $info->last_updated ) && is_string( $info->last_updated ) ? $info->last_updated : null;
+				// `external` marks an answer from a third-party updater hooked on the
+				// plugins_api filter, not from wordpress.org.
+				$wp_org       = empty( $info->external );
+				$last_updated = $wp_org && isset( $info->last_updated ) && is_string( $info->last_updated ) ? $info->last_updated : null;
+			} else {
+				// plugins_api() could not be loaded.
+				$unknown = true;
 			}
 
 			$abandoned_plugin = false;
@@ -287,7 +301,7 @@ final class PluginInventory implements Check {
 		];
 
 		if ( [] !== $findings ) {
-			return Result::warn(
+			$result = Result::warn(
 				sprintf(
 					/* translators: %s: Number of closed or abandoned plugins. */
 					_n(
@@ -301,9 +315,13 @@ final class PluginInventory implements Check {
 				$data,
 				$findings
 			);
+		} else {
+			$result = Result::pass( __( 'No closed or abandoned plugins found.', 'rtcamp-amc-copilot' ), $data );
 		}
 
-		return Result::pass( __( 'No closed or abandoned plugins found.', 'rtcamp-amc-copilot' ), $data );
+		// Without an answer for every plugin, a missing finding may only mean
+		// "not asked": resolve nothing (and so never re-alert on the next good run).
+		return $unknown ? $result->partial() : $result;
 	}
 
 	/**

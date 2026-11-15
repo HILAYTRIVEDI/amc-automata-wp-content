@@ -24,7 +24,7 @@ AMC Copilot is a WordPress plugin that puts every recurring AMC maintenance chec
 **Phase 1 scope (what is in the code)**
 
 - 32 checks in 11 groups (the plan's text says "31" but its own catalogue and the code both list 32; see section 4).
-- 13 console screens: Overview, Updates, Vulnerabilities, Security, Errors, Smoke checks, Performance, Inventory, Runs, Changes, Reports, Settings and Setup (the setup wizard is standalone, with no navigation).
+- 14 console screens: Overview, Updates, Vulnerabilities, Security, Errors, Smoke checks, Performance, Inventory, Runs, Changes, Reports, Settings, Help and Setup (the setup wizard is standalone, with no navigation).
 - Email: immediate alerts, a daily digest at 09:00 site time, and report emails (draft ready, published).
 - Reports: monthly, quarterly, annual and custom periods; 18 section blocks plus a custom section block; the browser prints them to PDF.
 - A CVE provider interface with a `NullProvider` default. rtCamp's real provider is not in this repository.
@@ -475,7 +475,7 @@ All 32 checks. "Schedule" is the default, before overrides. "Event" means the ch
 | `security.admins` | `Security/AdminSnapshot.php` | security | daily | Users with the administrator role, compared with the latest `admins` snapshot. |
 | `ssl.certificate` | `Security/SslCertificate.php` | security | daily | A TLS connection to the host with `capture_peer_cert` (verification off on purpose), parsed by `Support\CertParse`. |
 | `perf.response` | `Performance/ResponseTime.php` | performance | hourly | No requests of its own. Reads the history and daily buckets that the latest `smoke.urls` run stored. |
-| `perf.database` | `Performance/DatabaseCheck.php` | performance | daily | Table sizes from `information_schema` (fallback `SHOW TABLE STATUS`), and the autoloaded options size. |
+| `perf.database` | `Performance/DatabaseCheck.php` | performance | daily | Table sizes from `information_schema` (fallback `SHOW TABLE STATUS`), and the autoloaded options size (every value in `wp_autoload_values_to_autoload()`: `yes`, `on`, `auto-on`, `auto`). |
 | `perf.cache` | `Performance/CacheCheck.php` | performance | daily | Site Health's persistent object cache and page cache tests (about three loopback requests each), and the page cache detail (reflection, or the home page headers). |
 | `perf.slow_queries` | `Performance/SlowQueries.php` | performance | hourly | `amc_queries` for the last 24 hours, grouped by caller. |
 | `health.site_health` | `Health/SiteHealth.php` | health | daily | Site Health tests run as core's own scheduled check runs them (`Support\CoreSiteHealth`). The page cache test is left to `perf.cache`. |
@@ -503,7 +503,7 @@ The `data` shapes are from each class docblock. Only the main keys are listed he
 | `updates.php` | `installed`, `recommended`, `is_acceptable`, `blocking_plugins[]` | MEDIUM (version). Key `php:<installed>`. HIGH (plugin needs newer PHP). Key `php-plugin:<file>` | Digest | Updates | Hosting, `php_recommendation`, from `SiteFacts`. |
 | `updates.readiness` | `installed`, `next_major`, `plugins[]` (`tested_up_to`, `ready`), `ready`, `not_ready` | LOW per plugin. Key `readiness:<file>:<tested_up_to>` | None | Updates (readiness matrix) | None. |
 | `vuln.match` | `provider`, `provider_ready`, `provider_error`, `components`, `matches[]` (`VulnMatch::to_array()` plus `installed_version`), `counts` | The match's severity. Key `{type}:{slug}:{installed}:{reference}`, hashed if longer than 191 | Immediate if HIGH or CRITICAL, otherwise digest | Vulnerabilities | Security: `vulnerabilities` (period findings). |
-| `inventory.plugins` | `plugins[]` (`wp_org`, `closed`, `last_updated`, `abandoned`), `total`, `active`, `network_active`, `closed`, `abandoned`, `changes` | MEDIUM per closed or abandoned plugin (over 2 years). Keys `plugin:<file>:closed` and `:abandoned` | Digest | Inventory | Plugins and themes: the `inactive` list is live (`SiteFacts`). Lists come from `amc_changes`. |
+| `inventory.plugins` | `plugins[]` (`wp_org`, `closed`, `last_updated`, `abandoned`), `total`, `active`, `network_active`, `closed`, `abandoned`, `changes` | MEDIUM per closed or abandoned plugin (over 2 years). Keys `plugin:<file>:closed` and `:abandoned`. Partial (nothing resolves) when wordpress.org did not answer for a plugin; answers from a third-party updater (`external`) are not wp.org | Digest | Inventory | Plugins and themes: the `inactive` list is live (`SiteFacts`). Lists come from `amc_changes`. |
 | `inventory.themes` | `themes[]`, `total`, `active` | None | None | Inventory | Theme section uses live `SiteFacts::active_theme()`. |
 | `inventory.mu_dropins` | `mu_plugins[]`, `dropins[]`, `total` | None | None | Inventory | None. |
 | `inventory.editor` | `classic_editor`, `classic_editor_active`, `post_types{}`, `editor` (block, classic or mixed) | None | None | Inventory | CMS `editor_type` is live (`SiteFacts::editor_type()`). |
@@ -516,7 +516,7 @@ The `data` shapes are from each class docblock. Only the main keys are listed he
 | `security.admins` | `admins[]`, `count`, `baseline`, `snapshot_at`, `changes[]` (`added`, `removed`, `role_changed`) | HIGH (added). MEDIUM (role changed). LOW (removed). Key `admin:<change>:<user_id>` | Immediate if added, otherwise digest | Security | None. User management uses live counts and `amc_changes`. |
 | `ssl.certificate` | `host`, `https`, `available`, `reason`, `issuer`, `subject_cn`, `serial`, `sans[]`, `valid_from`, `valid_to`, `days_left`, `expired`, `expiring_soon` | Only when expired or at most 14 days left. CRITICAL (expired or at most 3 days). HIGH otherwise. Key `ssl:<serial>` | Immediate at 14 days or fewer | Security | SSL: `https`, `issuer`, `expires_at`, `days_left` (latest run). |
 | `perf.response` | `checked_at`, `threshold_pct` (20), `avg_ms`, `urls[]`, `trend[]` (30 days) | MEDIUM when 50% or more slower, otherwise LOW (digest). Key `slow:<md5(url)>` | Digest | Performance | Performance: `response_trend` from `perf.response` runs in the period. |
-| `perf.database` | `source`, `tables[]`, `total_mb`, `autoload_kb`, `autoload_over` | MEDIUM when autoload is over 800 KB. Key `autoload:<kb>` | Digest | Performance | Performance: `database_size_bytes`, `autoload_size_bytes` (latest run). |
+| `perf.database` | `source`, `tables[]`, `total_mb`, `autoload_kb`, `autoload_over` | MEDIUM when autoload is over 800 KB. Key `autoload:over` | Digest | Performance | Performance: `database_size_bytes`, `autoload_size_bytes` (latest run). |
 | `perf.cache` | `persistent_object_cache`, `page_cache_hit`, `page_cache_status`, `object_cache_status`, `response_time_ms`, `advanced_cache_present` | None (PASS or INFO) | None | Performance | Caching and CDN: `page_cache`, `object_cache` (latest run). |
 | `perf.slow_queries` | `since`, `queries`, `callers[]` (`caller`, `count`, `max_ms`, `avg_ms`, `sample`) | LOW, or MEDIUM from 1,000 ms. Key `caller:<md5(caller)>` | Digest | Performance | None. |
 | `health.site_health` | `tests[]` (`id`, `label`, `status`, `critical`), `critical`, `recommended`, `good`, `errors` | MEDIUM per critical test. LOW per recommended test. Keys `site-health:<id>` and `:recommended` | Digest | Overview (group status) | None. |
@@ -591,7 +591,7 @@ The run's `trigger` value is `cron` (scheduler), `manual` (console "Run now", re
 4. `process_queue()`: runs queued rows, oldest first (`created_at`, then `id`), until the time budget (default 25 s, filter `amc_scheduler_time_budget`) runs out. If it runs out, it calls `kick()` to schedule another drain.
 5. `due_checks()`: for each registered check, the due time is the last run's time plus the effective interval (`last_run_times()`). A check that has never run is due immediately. Checks with schedule `event` and checks disabled in settings are skipped. Due checks are sorted by due time, oldest first. A check that missed several intervals runs **once** (catch-up once). Each due check is run with trigger `cron` until the budget runs out.
 
-`process_queue()` returns the number of queued runs it completed. `next_runs()` gives the next run time for each check, used by the Overview and the checks list.
+`process_queue()` returns the number of queued runs it completed. `next_runs()` gives the next run time for each check, used by the Overview and the checks list. `stale_checks()` lists enabled checks whose latest result is older than two of their intervals (the scheduler missed runs); the Overview shows them in a warning.
 
 ### 5.4 Cron events
 
@@ -812,7 +812,7 @@ Anonymous requests get 401; logged-in users without the capability get 403. All 
 
 | Method | Path | Permission | Controller (`inc/Rest/…`, method) | Returns | Data source |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/overview` | manage | `OverviewController::get_overview()` | `status`, `kill_switch`, `findings_by_severity`, `groups[]`, `versions`, `counts`, `next_runs[]` | `amc_runs` (latest result per check), `amc_findings` (open counts), `update_*` site transients, `Registry`, `Scheduler::next_runs()` |
+| GET | `/overview` | manage | `OverviewController::get_overview()` | `status`, `kill_switch`, `findings_by_severity`, `stale[]`, `groups[]`, `versions`, `counts`, `next_runs[]` | `amc_runs` (latest result per **enabled, registered** check), `amc_findings` (open counts, enabled checks only), `update_*` site transients, `Registry`, `Scheduler::next_runs()`, `Scheduler::stale_checks()` (latest result older than two intervals) |
 | GET | `/checks` | manage | `ChecksController::list_checks()` | `Check[]` with `schedule`, `default_schedule`, `enabled`, `last_run`, `next_run_at` | `Registry`, `amc_settings` (overrides), `amc_runs` |
 | POST | `/checks/run` | manage | `ChecksController::run_checks()` | 202 `{ runs: [{ check_id, run_id }] }` | `Runner::enqueue()` (writes `amc_runs`); `"all"` expands to every check |
 | GET | `/runs` | manage | `RunsController::list_runs()` | `Run[]` with `X-WP-Total`, `X-WP-TotalPages`. Filters: `check_id`, `status`, `trigger`, `since`, `until`, `page`, `per_page` | `amc_runs` (`RunsRepository::query()`) |
@@ -874,7 +874,7 @@ Error codes the plugin returns: `amc_not_found`, `amc_unknown_check`, `amc_locke
 
 | Surface | URL | React file | REST calls (from `api/index.js`) | PHP controller | Underlying source |
 | --- | --- | --- | --- | --- | --- |
-| Overview | `screen=overview` | `screens/Overview.js` | `getOverview` → `GET /overview`. Run all: `RunChecksButton` (`getChecks`, then `runCheck('all')`) | `OverviewController::get_overview()` | Latest run per check (`amc_runs`), open findings by severity (`amc_findings`), `update_*` transients, `Registry`, schedule times |
+| Overview | `screen=overview` | `screens/Overview.js` | `getOverview` → `GET /overview`. Run all: `RunChecksButton` (`getChecks`, then `runCheck('all')`) | `OverviewController::get_overview()` | Latest run per enabled check (`amc_runs`), open findings by severity (`amc_findings`), stale results (a warning listing checks older than two intervals), `update_*` transients, `Registry`, schedule times |
 | Updates | `screen=updates` | `screens/Updates.js` | `getUpdates` → `GET /updates`. Run check and polling: `RunNowButton` | `UpdatesController::get_screen()` | Latest runs of `updates.*`; CSV from the plugin and theme rows |
 | Vulnerabilities | `screen=vulnerabilities` | `screens/Vulnerabilities.js` | `getVulnerabilities` → `GET /vulnerabilities?status=`. Accept risk: `acceptRisk` → `POST /findings/{id}/status` with `accepted` and a note | `VulnerabilitiesController::get_screen()` | `Providers::current()`, latest `vuln.match` run, `vuln.match` findings |
 | Security | `screen=security` | `screens/Security.js` | `getSecurity` → `GET /security` | `SecurityController::get_screen()` | Latest `security.*` runs and `ssl.certificate`; unresolved findings of those four checks |
@@ -886,6 +886,7 @@ Error codes the plugin returns: `amc_not_found`, `amc_unknown_check`, `amc_locke
 | Changes | `screen=changes` | `screens/Changes.js` | `getChanges` → `GET /changes` (filters: type, source, since, until) | `ChangesController::list_changes()` | `amc_changes` |
 | Reports | `screen=reports` | `screens/Reports.js` | `getReports` → `GET /reports`. `generateReport` → `POST /reports/generate`. `publishReport` → `POST /wp/v2/amc-reports/{id}` with `status: publish`. `getSavedFields` and `saveSavedFields` (`/saved-fields`). Edit opens `edit_url`; View opens `view_url` (null when not visible) | `ReportsController`, `ReportRestController` | `amc_report` posts and meta, `amc_saved_fields` option |
 | Settings | `screen=settings` | `screens/Settings.js` | `getSettings` and `saveSettings` → `GET` and `POST /settings`. `getChecks` → `GET /checks` (schedule table). `getEngineers`, `grantAccess`, `revokeAccess` → `/access`. `getCandidateUsers` → `GET /wp/v2/users`. `getSavedFields` and `saveSavedFields` | `SettingsController`, `AccessController`, `ChecksController`, `ReportsController` | `amc_settings`, `amc_changes` (access rows), users with `amc_manage`, `amc_saved_fields` |
+| Help | `screen=help` (and `&topic=<id>`) | `screens/Help.js` | None (static, searchable topics in a grouped sidebar, one topic at a time with Previous and Next for new engineers: quick start, the report workflow, field kinds, schedule, section sources, troubleshooting, glossary, WP-CLI; "Under the hood": data paths, tables, options and meta, what each check reads, screen routes) | None | Keep its facts in step with sections 3, 4.3, 9 and 10 of this file |
 | Setup (wizard) | `screen=setup` | `screens/Setup.js` | `getSetup` → `GET /setup`. `saveSettings`, `getSavedFields`, `saveSavedFields`. On finish: `runCheck('all')` (when chosen) and `completeSetup` → `POST /setup/complete` | `SetupController`, `SettingsController`, `ReportsController` | `SetupDefaults` (site name, domain, admin email, engineer emails, detected host, SSL issuer), `amc_setup_completed` |
 
 The Setup wizard has seven steps (`screens/Setup.js`): Welcome, Client and site, Hosting and backups, Domains, SSL and accessibility, Notifications, Report schedule, and Review. The Review step can queue all checks when the engineer chooses to.
@@ -999,14 +1000,14 @@ Quarterly, annual and custom periods longer than 62 days also get `totals` and `
 | `hosting` | Latest `hosting.platform` data (`host`, `server_type`/`os`, `web_server`/`server_software`, `mysql_version`/`db_version`, `php_version`, `memory_limit`), falling back to `SiteFacts`. `php_recommendation` from `SiteFacts` | `host` is null when not detectable |
 | `domains` | Host of the home URL (live) | |
 | `ssl` | Latest `ssl.certificate` run (`issuer`, `expires_at` or `valid_to`, `days_left`). `https` is from the home URL | |
-| `caching_cdn` | Latest `perf.cache` run (`page_cache`, `object_cache`), latest `detect.cdn` run (`cdn`) | |
-| `security` | `vulnerabilities`: `vuln.match` findings that overlap the period (`SnapshotBuilder::vulnerabilities()`). `core_checksums`: latest `security.checksums` run. `config_checks`: latest `security.config` run | Each vulnerability has `status`, `fixed_in`, `first_seen`, `resolved_at` |
-| `forms` | Latest `detect.forms` run (`form_plugins`, `integrations`) and `detect.mailer` run (`sending_method`) | |
-| `analytics` | Latest `detect.analytics` run (`gtm_ids`, `ga_ids`), with GA4 and UA merged in | |
-| `accessibility` | Latest `detect.accessibility` run (`third_party_tool`, `statement_page`) | |
+| `caching_cdn` | Latest `perf.cache` run: `page_cache` is "Detected" / "Not detected" from `page_cache_hit`; `object_cache` from `persistent_object_cache` (`SiteFacts` fallback). Latest `detect.cdn` run: `cdn` is its `provider` slug | |
+| `security` | `vulnerabilities`: `vuln.match` findings that overlap the period (`SnapshotBuilder::vulnerabilities()`). `core_checksums`: latest `security.checksums` run (its status, and the `modified` paths from `found[]`). `config_checks`: latest `security.config` run (`items[]`: `key` → `id`, `title` → `label`, `status`) | Each vulnerability has `status`, `fixed_in`, `first_seen`, `resolved_at` |
+| `forms` | Latest `detect.forms` run: `form_plugins` (the main plugin, its name from the installed list, `form_count`, add-on names) and `integrations` (the add-ons). Latest `detect.mailer` run: `sending_method` is the active mailer plugin's name, else "Custom code (phpmailer_init)" when callbacks exist, else "WordPress default (PHP mail)" | A run that found nothing gives empty lists; no run gives null |
+| `analytics` | Latest `detect.analytics` run: `gtm_ids` from `gtm[]`, `ga_ids` from `ga4[]` and `ua[]` | Both null when the check never ran |
+| `accessibility` | Latest `detect.accessibility` run: `third_party_tool` joins `tools[]`, `statement_page` is the first of `statement_pages[]` | |
 | `php_errors` | `amc_events` for the period: counts by type (fatal; warning and notice; deprecation and doing_it_wrong) and the top signatures (at most 10) | Counts from `EventsRepository::counts_by_type()` |
 | `smoke_checks` | Every `smoke.urls` run in the period: runs, pass rate and average response per URL. `loopback_blocked` results are excluded | |
-| `performance` | Latest `perf.database` run (`database_size_bytes` or `total_size_bytes`; `autoload_size_bytes`, with a `SiteFacts` fallback). `response_trend` from the `perf.response` runs in the period | Weekly points for monthly reports, monthly points for longer ones |
+| `performance` | Latest `perf.database` run (`total_mb` and `autoload_kb`, converted to bytes; autoload falls back to `SiteFacts`). `response_trend` from the `perf.response` runs in the period | Weekly points for monthly reports, monthly points for longer ones |
 | `engineer_notes` | Nothing (engineer only) | |
 
 ### 10.5 Snapshot format and field sources

@@ -53,6 +53,27 @@ final class ConsolePage extends AbstractAdminPage {
 	}
 
 	/**
+	 * Hook suffix WordPress gives this page in Network Admin
+	 * (`toplevel_page_amc-copilot-network`).
+	 *
+	 * @return string Hook suffix.
+	 */
+	public static function network_hook_suffix(): string {
+		return 'toplevel_page_' . self::SLUG . '-network';
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function register_hooks(): void {
+		parent::register_hooks();
+
+		if ( is_multisite() ) {
+			add_action( 'network_admin_menu', [ $this, 'register_page' ] );
+		}
+	}
+
+	/**
 	 * URL of the console, optionally on a screen.
 	 *
 	 * @param string $screen Screen slug, e.g. `updates`. Empty for the Overview.

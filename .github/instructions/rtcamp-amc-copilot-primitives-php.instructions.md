@@ -1,5 +1,5 @@
 ---
-applyTo: "plugins/plugin-elementary-main/**/*.php"
+applyTo: "plugins/rtcamp-amc-copilot/**/*.php"
 description: "Framework + WordPress rules for PHP. Canonical source, shipped by rtcamp/wp-primitives."
 ---
 

@@ -70,7 +70,8 @@ final class ConsoleAssets implements Registrable {
 	 * @param string $hook_suffix Current admin page hook suffix.
 	 */
 	public function enqueue( string $hook_suffix ): void {
-		if ( ConsolePage::hook_suffix() !== $hook_suffix || ! current_user_can( Capabilities::MANAGE ) ) {
+		$is_console = ConsolePage::hook_suffix() === $hook_suffix || ConsolePage::network_hook_suffix() === $hook_suffix;
+		if ( ! $is_console || ! current_user_can( Capabilities::MANAGE ) ) {
 			return;
 		}
 
@@ -111,12 +112,14 @@ final class ConsoleAssets implements Registrable {
 	 * developer can flip it with the `amc_console_config` filter (for example
 	 * from an mu-plugin on a local site) to work on the UI with fixtures.
 	 *
-	 * @return array{restNonce: string, useMocks: bool}
+	 * @return array{restNonce: string, useMocks: bool, isNetworkAdmin: bool, isMultisite: bool}
 	 */
 	public function config(): array {
 		$config = [
-			'restNonce' => wp_create_nonce( 'wp_rest' ),
-			'useMocks'  => false,
+			'restNonce'      => wp_create_nonce( 'wp_rest' ),
+			'useMocks'       => false,
+			'isNetworkAdmin' => is_network_admin(),
+			'isMultisite'    => is_multisite(),
 		];
 
 		/**
@@ -124,13 +127,15 @@ final class ConsoleAssets implements Registrable {
 		 *
 		 * @since 0.1.0
 		 *
-		 * @param array{restNonce: string, useMocks: bool} $config Settings.
+		 * @param array{restNonce: string, useMocks: bool, isNetworkAdmin: bool, isMultisite: bool} $config Settings.
 		 */
 		$filtered = apply_filters( 'amc_console_config', $config );
 
 		return [
-			'restNonce' => (string) ( $filtered['restNonce'] ?? $config['restNonce'] ),
-			'useMocks'  => (bool) ( $filtered['useMocks'] ?? false ),
+			'restNonce'      => (string) ( $filtered['restNonce'] ?? $config['restNonce'] ),
+			'useMocks'       => (bool) ( $filtered['useMocks'] ?? false ),
+			'isNetworkAdmin' => (bool) ( $filtered['isNetworkAdmin'] ?? $config['isNetworkAdmin'] ),
+			'isMultisite'    => (bool) ( $filtered['isMultisite'] ?? $config['isMultisite'] ),
 		];
 	}
 

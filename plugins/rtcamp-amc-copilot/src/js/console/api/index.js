@@ -1136,21 +1136,77 @@ export const generateReport = async ( {
  * (`POST /wp/v2/amc-reports/{id}`), as the contract says report editing and
  * publishing go through core.
  *
- * @param {number} id Report post id.
+ * @param {number}  id                       Report post id.
+ * @param {Object}  options                  Optional publish options.
+ * @param {boolean} [options.sendEmail=true] Whether to send report email to client upon publish.
  * @return {Promise<{id: number, status: string}>} Updated post.
  */
-export const publishReport = async ( id ) =>
-	(
+export const publishReport = async ( id, options = {} ) => {
+	const sendEmail = options.sendEmail ?? true;
+	return (
 		await request( {
 			namespace: '/wp/v2',
 			path: `/amc-reports/${ id }`,
 			method: 'POST',
-			data: { status: 'publish' },
+			data: {
+				status: 'publish',
+				meta: { _amc_send_publish_email: sendEmail },
+			},
 			mock: ( s ) => {
 				const report = s.reports.find( ( r ) => r.id === id );
-				report.status = 'publish';
+				if ( report ) {
+					report.status = 'publish';
+					if ( sendEmail ) {
+						report.email_sent = Math.floor( Date.now() / 1000 );
+					}
+				}
 				return ok( { id, status: 'publish' } );
 			},
+		} )
+	).body;
+};
+
+/**
+ * GET /reports/recipients
+ *
+ * @return {Promise<{recipients: string[]}>} Registered client recipient email addresses.
+ */
+export const getPublishRecipients = async () =>
+	(
+		await request( {
+			path: '/reports/recipients',
+			method: 'GET',
+			mock: () =>
+				ok( {
+					recipients: [
+						'client-admin@example.com',
+						'team@example.com',
+					],
+				} ),
+		} )
+	).body;
+
+/**
+ * POST /reports/{id}/send-client
+ *
+ * @param {number} id Report ID.
+ * @return {Promise<{success: boolean, sent_at: number, recipients: string[], message: string}>} Send result.
+ */
+export const sendReportToClient = async ( id ) =>
+	(
+		await request( {
+			path: `/reports/${ id }/send-client`,
+			method: 'POST',
+			mock: () =>
+				ok( {
+					success: true,
+					sent_at: Math.floor( Date.now() / 1000 ),
+					recipients: [
+						'client-admin@example.com',
+						'team@example.com',
+					],
+					message: 'Report successfully sent.',
+				} ),
 		} )
 	).body;
 
@@ -1376,3 +1432,61 @@ export const completeSetup = async () =>
 			},
 		} )
 	).body;
+
+/**
+ * GET /network/sites
+ *
+ * @param {Object} [query] Pagination query args.
+ * @return {Promise<{items: Array<Object>, total: number, totalPages: number}>} Network sites.
+ */
+export const getNetworkSites = async ( query = {} ) => {
+	const res = await request( {
+		path: '/network/sites',
+		query,
+		mock: () =>
+			ok( [
+				{
+					id: 1,
+					domain: 'localhost',
+					path: '/',
+					name: 'Main Network Site',
+					site_url: 'http://localhost',
+					admin_url:
+						'http://localhost/wp-admin/admin.php?page=amc-copilot',
+					status: 'pass',
+					findings: { critical: 0, high: 0, medium: 1, low: 2 },
+					latest_run: null,
+				},
+			] ),
+	} );
+
+	return {
+		items: res.body || [],
+		total: res.headers.total,
+		totalPages: res.headers.totalPages,
+	};
+};
+
+/**
+ * POST /network/run
+ *
+ * @param {Object} data
+ * @param {string} data.checkId  Check ID.
+ * @param {number} [data.blogId] Target blog ID (0 for all).
+ * @return {Promise<{check_id: string, queued: Object, count: number}>} Queued run details.
+ */
+export const queueNetworkRun = async ( { checkId, blogId = 0 } ) => {
+	const res = await request( {
+		path: '/network/run',
+		method: 'POST',
+		data: { check_id: checkId, blog_id: blogId },
+		mock: () =>
+			ok( {
+				check_id: checkId,
+				queued: { [ blogId || 1 ]: 123 },
+				count: 1,
+			} ),
+	} );
+
+	return res.body;
+};

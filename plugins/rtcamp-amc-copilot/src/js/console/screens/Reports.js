@@ -4,10 +4,12 @@
 import {
 	Button,
 	Modal,
+	RadioControl,
 	SelectControl,
+	Spinner,
 	TextControl,
 } from '@wordpress/components';
-import { useMemo, useState } from '@wordpress/element';
+import { useEffect, useMemo, useState } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 import { external, pencil, plus, published } from '@wordpress/icons';
 
@@ -16,6 +18,7 @@ import { external, pencil, plus, published } from '@wordpress/icons';
  */
 import {
 	generateReport,
+	getPublishRecipients,
 	getReports,
 	getSavedFields,
 	publishReport,
@@ -177,6 +180,207 @@ function GenerateForm( { closeModal, onDone } ) {
 }
 
 /**
+ * Modal form for publishing a report with option to send to client and list of recipients.
+ *
+ * @param {Object}                          props             Props.
+ * @param {Object}                          props.item        Report item.
+ * @param {(...args: unknown[]) => unknown} props.closeModal  Close modal callback.
+ * @param {(...args: unknown[]) => unknown} props.onPublished On published callback.
+ * @return {Element} Publish form.
+ */
+function PublishReportModal( { item, closeModal, onPublished } ) {
+	const [ sendEmail, setSendEmail ] = useState( true );
+	const [ busy, setBusy ] = useState( false );
+	const [ recipients, setRecipients ] = useState( [] );
+	const [ loadingRecipients, setLoadingRecipients ] = useState( true );
+	const notice = useNotice();
+
+	useEffect( () => {
+		let active = true;
+		getPublishRecipients()
+			.then( ( res ) => {
+				if ( active && res && Array.isArray( res.recipients ) ) {
+					setRecipients( res.recipients );
+				}
+			} )
+			.catch( () => {
+				// Keep empty on error.
+			} )
+			.finally( () => {
+				if ( active ) {
+					setLoadingRecipients( false );
+				}
+			} );
+		return () => {
+			active = false;
+		};
+	}, [] );
+
+	const handleSubmit = async ( e ) => {
+		e.preventDefault();
+		setBusy( true );
+		try {
+			await publishReport( item.id, { sendEmail } );
+			notice.success(
+				sendEmail
+					? __(
+							'Report published and sent to client.',
+							'rtcamp-amc-copilot'
+						)
+					: __(
+							'Report published (email not sent).',
+							'rtcamp-amc-copilot'
+						)
+			);
+			onPublished();
+			closeModal();
+		} catch ( err ) {
+			notice.error( err.message );
+			setBusy( false );
+		}
+	};
+
+	let recipientsContent = null;
+	if ( loadingRecipients ) {
+		recipientsContent = (
+			<div
+				style={ {
+					display: 'flex',
+					alignItems: 'center',
+					gap: '8px',
+					color: '#64748b',
+				} }
+			>
+				<Spinner />{ ' ' }
+				{ __( 'Loading recipients…', 'rtcamp-amc-copilot' ) }
+			</div>
+		);
+	} else if ( recipients.length > 0 ) {
+		recipientsContent = (
+			<ul
+				style={ {
+					margin: 0,
+					paddingLeft: '16px',
+					color: '#0f172a',
+					lineHeight: 1.6,
+				} }
+			>
+				{ recipients.map( ( email ) => (
+					<li key={ email }>{ email }</li>
+				) ) }
+			</ul>
+		);
+	} else {
+		recipientsContent = (
+			<span style={ { color: '#94a3b8' } }>
+				{ __(
+					'No client recipients registered in AMC Settings.',
+					'rtcamp-amc-copilot'
+				) }
+			</span>
+		);
+	}
+
+	return (
+		<form onSubmit={ handleSubmit }>
+			<p>
+				{ sprintf(
+					/* translators: %s: report id. */
+					__(
+						'Publishing %s makes it visible to client administrators. Changed saved fields are carried forward.',
+						'rtcamp-amc-copilot'
+					),
+					item.report_id
+				) }
+			</p>
+
+			<fieldset
+				style={ { margin: '16px 0', border: 'none', padding: 0 } }
+			>
+				<legend
+					style={ {
+						fontWeight: 600,
+						marginBottom: '8px',
+						fontSize: '13px',
+					} }
+				>
+					{ __( 'Send report to client?', 'rtcamp-amc-copilot' ) }
+				</legend>
+				<RadioControl
+					selected={ sendEmail ? 'yes' : 'no' }
+					options={ [
+						{
+							label: __(
+								'Yes, send report to registered client emails',
+								'rtcamp-amc-copilot'
+							),
+							value: 'yes',
+						},
+						{
+							label: __(
+								'No, publish only (do not send email)',
+								'rtcamp-amc-copilot'
+							),
+							value: 'no',
+						},
+					] }
+					onChange={ ( val ) => setSendEmail( val === 'yes' ) }
+				/>
+			</fieldset>
+
+			<div
+				style={ {
+					background: '#f8fafc',
+					border: '1px solid #e2e8f0',
+					borderRadius: '6px',
+					padding: '12px',
+					marginBottom: '16px',
+					fontSize: '12px',
+				} }
+			>
+				<strong
+					style={ {
+						display: 'block',
+						marginBottom: '6px',
+						color: '#334155',
+					} }
+				>
+					{ __(
+						'Registered recipient emails:',
+						'rtcamp-amc-copilot'
+					) }
+				</strong>
+				{ recipientsContent }
+			</div>
+
+			<div className="amc-modal-actions">
+				<Button
+					variant="tertiary"
+					onClick={ closeModal }
+					disabled={ busy }
+				>
+					{ __( 'Cancel', 'rtcamp-amc-copilot' ) }
+				</Button>
+				<Button
+					variant="primary"
+					type="submit"
+					isBusy={ busy }
+					disabled={ busy }
+					accessibleWhenDisabled
+				>
+					{ sendEmail
+						? __( 'Publish & send email', 'rtcamp-amc-copilot' )
+						: __(
+								'Publish without sending',
+								'rtcamp-amc-copilot'
+							) }
+				</Button>
+			</div>
+		</form>
+	);
+}
+
+/**
  * Reports screen (`GET /reports`): report list, generate a report, saved
  * fields. Editing opens the block editor; publishing uses core's REST route
  * for the post type. Generating is lane D1 and shows "not available yet"
@@ -255,45 +459,13 @@ export default function Reports() {
 				icon: published,
 				isEligible: ( item ) => 'draft' === item.status,
 				modalHeader: __( 'Publish report', 'rtcamp-amc-copilot' ),
-				modalSize: 'small',
+				modalSize: 'medium',
 				RenderModal: ( { items, closeModal } ) => (
-					<div>
-						<p>
-							{ sprintf(
-								/* translators: %s: report id. */
-								__(
-									'Publishing %s makes it visible to client administrators. Changed saved fields are carried forward.',
-									'rtcamp-amc-copilot'
-								),
-								items[ 0 ].report_id
-							) }
-						</p>
-						<div className="amc-modal-actions">
-							<Button variant="tertiary" onClick={ closeModal }>
-								{ __( 'Cancel', 'rtcamp-amc-copilot' ) }
-							</Button>
-							<Button
-								variant="primary"
-								onClick={ async () => {
-									try {
-										await publishReport( items[ 0 ].id );
-										notice.success(
-											__(
-												'Report published.',
-												'rtcamp-amc-copilot'
-											)
-										);
-										reload();
-									} catch ( err ) {
-										notice.error( err.message );
-									}
-									closeModal();
-								} }
-							>
-								{ __( 'Publish', 'rtcamp-amc-copilot' ) }
-							</Button>
-						</div>
-					</div>
+					<PublishReportModal
+						item={ items[ 0 ] }
+						closeModal={ closeModal }
+						onPublished={ reload }
+					/>
 				),
 			},
 			{
@@ -307,7 +479,7 @@ export default function Reports() {
 				},
 			},
 		],
-		// eslint-disable-next-line react-hooks/exhaustive-deps
+
 		[ reload ]
 	);
 

@@ -268,4 +268,36 @@ final class Scheduler implements Registrable {
 
 		return $next;
 	}
+
+	/**
+	 * Enabled, scheduled checks whose latest result is older than two of their
+	 * intervals: the scheduler has missed at least one run (WP-Cron not firing,
+	 * the kill switch, a lock that never clears), so the shown result is stale.
+	 * A check that never ran is not listed (it has no result to be stale).
+	 *
+	 * @param array<string, \AMC\Checks\Check> $checks     Registered checks, by id.
+	 * @param array<string, int>               $last_times Check id => Unix time of its latest result.
+	 * @param int                              $now        Unix time.
+	 *
+	 * @return array<string, int> Check id => Unix time of its latest result, oldest first.
+	 */
+	public static function stale_checks( array $checks, array $last_times, int $now ): array {
+		$stale = [];
+
+		foreach ( $checks as $id => $check ) {
+			$schedule = Registry::effective_schedule( $check );
+
+			if ( Schedule::EVENT === $schedule || ! Settings::check_enabled( $id ) || ! isset( $last_times[ $id ] ) ) {
+				continue;
+			}
+
+			if ( $now - $last_times[ $id ] > 2 * $schedule->seconds() ) {
+				$stale[ $id ] = $last_times[ $id ];
+			}
+		}
+
+		asort( $stale );
+
+		return $stale;
+	}
 }

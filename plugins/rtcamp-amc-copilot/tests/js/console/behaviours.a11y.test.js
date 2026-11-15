@@ -588,7 +588,7 @@ describeWithDom( 'Console accessibility behaviours', () => {
 			).toBe( 'Overview' );
 
 			// Six section tabs, so the row does not wrap.
-			expect( nav.querySelectorAll( 'a.nav-tab' ) ).toHaveLength( 6 );
+			expect( nav.querySelectorAll( 'a.nav-tab' ) ).toHaveLength( 7 );
 			// Overview has one screen: no sub-navigation.
 			expect( container.querySelector( '.subsubsub' ) ).toBeNull();
 
